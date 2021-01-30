@@ -1,10 +1,12 @@
 {
-  "name": "@lix/micro-shell-plus-plus",
-  "version": "0.0.1",
-  "description": "A shell written in C++ for embedded systems",
-  "author": {
-    "name": "Lix N. Paulian",
-    "email": "lix@paulian.net"
-  },
-  "license": "MIT"
+	"name": "@lix/micro-shell-plus",
+	"version": "0.0.2",
+	"description": "A micro shell written in C++ for embedded systems",
+	"author": {
+		"name": "Lix N. Paulian",
+		"email": "lix@paulian.net"
+	},
+	"license": "MIT",
+	"xpack": {
+	}
 }
