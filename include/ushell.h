@@ -34,88 +34,89 @@
 
 #include <tty-canonical.h>
 
-
 #if defined (__cplusplus)
 
-class ushell
+namespace ushell
 {
-public:
 
-  ushell (const char* name, const char* char_device);
+  class ushell
+  {
+  public:
 
-  ushell (const ushell&) = delete;
+    ushell (const char* char_device);
 
-  ushell (ushell&&) = delete;
+    ushell (const ushell&) = delete;
 
-  ushell&
-  operator= (const ushell&) = delete;
+    ushell (ushell&&) = delete;
 
-  ushell&
-  operator= (ushell&&) = delete;
+    ushell&
+    operator= (const ushell&) = delete;
 
-  virtual
-  ~ushell () noexcept;
+    ushell&
+    operator= (ushell&&) = delete;
 
-  void
-  get_version (uint8_t& version_major, uint8_t& version_minor,
-               uint8_t& version_patch);
+    virtual
+    ~ushell () noexcept;
 
+    void
+    get_version (uint8_t& version_major, uint8_t& version_minor,
+                 uint8_t& version_patch);
 
-  // --------------------------------------------------------------------
+    void*
+    ushell_th (void* args);
 
-protected:
+    typedef enum
+    {
+      USH_NO_ERROR = 0,
+      USH_INVALID_COMMAND = 1,
+      USH_INVALID_PARAMETER = 5,
+      USH_EXIT = 10
+    } error_types_t;
 
-  os::posix::tty_canonical* tty;
+    // -------------------------------------------------------------------------
 
-  // --------------------------------------------------------------------
+  protected:
 
-private:
+    int
+    printf (const char* format, ...);
 
-  int
-  put_c (char c);
+    os::posix::tty_canonical* tty;
 
-  int
-  printf (const char* format, ...);
+    static constexpr uint32_t max_params = 10;
 
-  int
-  cmdExec (char* buff);
+    int error_type = USH_NO_ERROR;
 
-  static void*
-  ushell_thread (void* args);
+    // -------------------------------------------------------------------------
 
-  static constexpr uint8_t VERSION_MAJOR = 0;
-  static constexpr uint8_t VERSION_MINOR = 0;
-  static constexpr uint8_t VERSION_PATCH = 1;
+  private:
 
-  const char* th_name_;
-  const char* char_device_;
+    bool
+    cmd_parser (char* buff);
 
-  static constexpr std::size_t th_stack_size = 4096;
+    static constexpr uint8_t VERSION_MAJOR = 0;
+    static constexpr uint8_t VERSION_MINOR = 0;
+    static constexpr uint8_t VERSION_PATCH = 2;
 
-  os::rtos::thread_inclusive<th_stack_size> th_
-    { th_name_, ushell_thread, static_cast<void*> (this) };
+    const char* char_device_;
 
-};
+  };
 
-/**
- * @brief Return the shell's version.
- * @param version_major: major version.
- * @param version_minor: minor version.
- * @param version_patch: patch version.
- */
-inline void
-ushell::get_version (uint8_t& version_major, uint8_t& version_minor,
-                     uint8_t& version_patch)
-{
-  version_major = VERSION_MAJOR;
-  version_minor = VERSION_MINOR;
-  version_patch = VERSION_PATCH;
-}
+  /**
+   * @brief Return the shell's version.
+   * @param version_major: major version.
+   * @param version_minor: minor version.
+   * @param version_patch: patch version.
+   */
+  inline void
+  ushell::get_version (uint8_t& version_major, uint8_t& version_minor,
+                       uint8_t& version_patch)
+  {
+    version_major = VERSION_MAJOR;
+    version_minor = VERSION_MINOR;
+    version_patch = VERSION_PATCH;
+  }
 
-inline int
-ushell::put_c (char c)
-{
-  return tty->write (&c, 1);
+//----------------------------------------------------------------------------
 }
 
 #endif /* __cplusplus */
