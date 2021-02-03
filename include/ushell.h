@@ -36,8 +36,30 @@
 
 #if defined (__cplusplus)
 
+#if !defined USH_MAX_COMMANDS
+#define USH_MAX_COMMANDS 40
+#endif
+
 namespace ushell
 {
+  class ushell_cmd;
+
+  typedef struct
+  {
+    const char* command;
+    const char* help_text;
+  } cmd_info_t;
+
+  typedef enum
+  {
+    ush_ok = 0,
+    ush_cmd_not_found,
+    ush_cmd_not_allowed,
+    ush_param_invalid = 5,
+
+    ush_user_timeout = 98,
+    ush_exit
+  } error_types_t;
 
   class ushell
   {
@@ -63,39 +85,34 @@ namespace ushell
                  uint8_t& version_patch);
 
     void*
-    ushell_th (void* args);
+    do_ushell (void* args);
 
-    typedef enum
-    {
-      USH_NO_ERROR = 0,
-      USH_INVALID_COMMAND = 1,
-      USH_INVALID_PARAMETER = 5,
-      USH_EXIT = 10
-    } error_types_t;
-
-    // -------------------------------------------------------------------------
-
-  protected:
+    static bool
+    link_cmd (class ushell_cmd* ucmd);
 
     int
     printf (const char* format, ...);
 
+    static ushell_cmd* ushell_cmds_[USH_MAX_COMMANDS];
+
+    //--------------------------------------------------------------------------
+
+  protected:
+
     os::posix::tty_canonical* tty;
 
-    static constexpr uint32_t max_params = 10;
-
-    int error_type = USH_NO_ERROR;
-
-    // -------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
 
   private:
 
-    bool
-    cmd_parser (char* buff);
+    int
+    cmd_parser (char* buff, ssize_t len);
 
     static constexpr uint8_t VERSION_MAJOR = 0;
     static constexpr uint8_t VERSION_MINOR = 0;
-    static constexpr uint8_t VERSION_PATCH = 2;
+    static constexpr uint8_t VERSION_PATCH = 4;
+
+    static constexpr int max_params = 10;
 
     const char* char_device_;
 
@@ -116,7 +133,104 @@ namespace ushell
     version_patch = VERSION_PATCH;
   }
 
-//----------------------------------------------------------------------------
+  //----------------------------------------------------------------------------
+
+  class ushell_cmd
+  {
+  public:
+
+    ushell_cmd (void);
+
+    ushell_cmd (const ushell_cmd&) = delete;
+
+    ushell_cmd (ushell_cmd&&) = delete;
+
+    ushell_cmd&
+    operator= (const ushell_cmd&) = delete;
+
+    ushell_cmd&
+    operator= (ushell_cmd&&) = delete;
+
+    virtual
+    ~ushell_cmd () noexcept;
+
+    virtual int
+    do_cmd (class ushell* ush, int argc, char* argv[]) = 0;
+
+    cmd_info_t*
+    get_cmd_info (void);
+
+  protected:
+
+    cmd_info_t info_;
+    class ushell* ush;
+
+  };
+
+  //----------------------------------------------------------------------------
+
+  class ush_version : public ushell_cmd
+  {
+  public:
+
+    ush_version (void);
+
+    virtual
+    ~ush_version () noexcept;
+
+    virtual int
+    do_cmd (class ushell* ush, int argc, char* argv[]);
+
+  };
+
+  //----------------------------------------------------------------------------
+
+  class ush_help : public ushell_cmd
+  {
+  public:
+
+    ush_help (void);
+
+    virtual
+    ~ush_help () noexcept;
+
+    virtual int
+    do_cmd (class ushell* ush, int argc, char* argv[]);
+
+  };
+
+  //----------------------------------------------------------------------------
+
+  class ush_quit : public ushell_cmd
+  {
+  public:
+
+    ush_quit (void);
+
+    virtual
+    ~ush_quit () noexcept;
+
+    virtual int
+    do_cmd (class ushell* ush, int argc, char* argv[]);
+
+  };
+
+  //----------------------------------------------------------------------------
+
+  class ush_test : public ushell_cmd
+  {
+  public:
+
+    ush_test (void);
+
+    virtual
+    ~ush_test () noexcept;
+
+    virtual int
+    do_cmd (class ushell* ush, int argc, char* argv[]);
+
+  };
+
 }
 
 #endif /* __cplusplus */

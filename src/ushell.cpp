@@ -42,6 +42,9 @@ using namespace os;
 
 namespace ushell
 {
+
+  class ushell_cmd* ushell::ushell_cmds_[USH_MAX_COMMANDS];
+
   ushell::ushell (const char* char_device) :
       char_device_
         { char_device }
@@ -55,18 +58,21 @@ namespace ushell
   }
 
   void*
-  ushell::ushell_th (void* args)
+  ushell::do_ushell (void* args)
   {
     int c;
     char buffer[256];
+    char greet[] =
+      { "\nType \"help\" for the list of available commands\n" };
     char prompt[] =
       { ": " };
 
     tty = static_cast<posix::tty_canonical*> (posix::open (char_device_, 0));
-
     if (tty != nullptr)
       {
         struct termios tio_orig, tio;
+
+        rtos::sysclock.sleep_for (rtos::sysclock.frequency_hz * 2);
 
         if (!((tty->tcgetattr (&tio)) < 0))
           {
@@ -79,21 +85,24 @@ namespace ushell
             tio.c_cc[VERASE] = '\b';
             if (!((tty->tcsetattr (TCSANOW, &tio)) < 0))
               {
+                tty->write (greet, strlen (greet));
                 do
                   {
                     tty->write (prompt, strlen (prompt));
                     if ((c = tty->read (buffer, sizeof(buffer))) > 0)
                       {
                         buffer[c] = '\0';
-                        bool result = cmd_parser (buffer); // parse and execute command
 
-                        if (result == false)
+                        // parse and execute command
+                        int result = cmd_parser (buffer, c);
+                        if (result == ush_exit)
                           {
-                            if (error_type == USH_EXIT)
-                              {
-                                // exit command, we must leave now
-                                break;
-                              }
+                            // exit command, we must leave now
+                            break;
+                          }
+                        else if (result != ush_ok)
+                          {
+                            printf ("Error %d\n", result);
                           }
                       }
                   }
@@ -125,79 +134,242 @@ namespace ushell
 
   //----------------------------------------------------------------------------
 
-  bool
-  ushell::cmd_parser (char* buff)
+  int
+  ushell::cmd_parser (char* buff, ssize_t len)
   {
+    class ushell_cmd** pclasses;
     char* pbuff;
-//    const cmds_t* pcmd;
-//    const cmdstab_t* pcmdtab;
-    bool done = false;
-    char* argv[max_params];     // pointers on parameters
-    int argc;                   // parameter counter
-    bool result = false;
-    error_type = USH_INVALID_COMMAND;
+    char* argv[max_params];
+    int result = ush_ok;
 
-    // isolate the command
-    pbuff = buff;
-    while (*pbuff != ' ' && *pbuff != '\0')
+    if (len > 1) // ignore empty strings, at least two chars are expected
       {
-        pbuff++;
-      }
-    *pbuff++ = '\0'; // insert terminator
+        pbuff = buff;
 
-#if 0
-    /* iterate all commands tables, one by one */
-    for (pcmdtab = cmdtabs; pcmdtab->cmdstable; pcmdtab++)
-      {
-        // lookup in the commands table
-        for (pcmd = pcmdtab->cmdstable; pcmd->name; pcmd++)
+        // extract the command
+        while (*pbuff != ' ' && *pbuff != '\0' && *pbuff != '\n' && len--)
           {
-            if (!strcasecmp (buff, pcmd->name))
+            pbuff++;
+          }
+        *pbuff++ = '\0'; // add terminator
+        len--;
+
+        // iterate all linked command classes
+        result = ush_cmd_not_found;
+        for (pclasses = ushell_cmds_; *pclasses != nullptr; pclasses++)
+          {
+            if (!strcasecmp ((*pclasses)->get_cmd_info ()->command, buff))
               {
+                int argc;
+
                 // valid command, parse parameters, if any
                 for (argc = 0; argc < max_params; argc++)
                   {
-                    if (!*pbuff)
+                    if (!len)
                       {
-                        break;                  // end of line reached
+                        break;          // end of line reached
                       }
                     if (*pbuff == '\"')
                       {
-                        pbuff++;                // suck up the "
+                        pbuff++;        // skip the "
+                        len--;
                         argv[argc] = pbuff;
-                        while (*pbuff != '\"' && *pbuff != '\0')
+                        while (*pbuff != '\"' && *pbuff != '\0'
+                            && *pbuff != '\n' && len--)
                           {
                             pbuff++;
                           }
                         *pbuff++ = '\0';
-                        if (*pbuff)             // if not end of line...
+                        len--;
+                        if (len--)      // if not end of line...
                           {
-                            pbuff++;            // suck up the trailing space
+                            pbuff++;    // skip the trailing space
                           }
                       }
                     else
                       {
+                        while ((*pbuff == ' ' || *pbuff == '\t'
+                            || *pbuff == '\n') && len--)
+                          {
+                            pbuff++;    // skip possible leading white spaces
+                          }
+                        if (len <= 0)
+                          {
+                            break;
+                          }
                         argv[argc] = pbuff;
-                        while (*pbuff != ' ' && *pbuff != '\0')
+                        while (*pbuff != ' ' && *pbuff != '\0' && *pbuff != '\n'
+                            && len--)
                           {
                             pbuff++;
                           }
                         *pbuff++ = '\0';
+                        len--;
                       }
                   }
-                result = (*pcmd->func) (argc, &argv[0]); // execute command
-                done = true;    // all done
+                result = (*pclasses)->do_cmd (this, argc, argv);
                 break;
               }
           }
-        if (done)               // if all done, break out
+      }
+
+    return result;
+  }
+
+  bool
+  ushell::link_cmd (class ushell_cmd* ucmd)
+  {
+    bool result = false;
+
+    for (int i = 0; i < USH_MAX_COMMANDS; i++)
+      {
+        if (ushell_cmds_[i] == nullptr)
           {
+            ushell_cmds_[i] = ucmd;
+            result = true;
             break;
           }
       }
-#endif
+
     return result;
   }
+
+  //----------------------------------------------------------------------------
+
+  ushell_cmd::ushell_cmd (void)
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+    ushell::link_cmd (this);
+  }
+
+  ushell_cmd::~ushell_cmd ()
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+  }
+
+  cmd_info_t*
+  ushell_cmd::get_cmd_info (void)
+  {
+    return &info_;
+  }
+
+  //----------------------------------------------------------------------------
+
+  ush_version::ush_version (void)
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+    info_.command = "ver";
+    info_.help_text = "Show the ushell version";
+  }
+
+  ush_version::~ush_version ()
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+  }
+
+  int
+  ush_version::do_cmd (class ushell* ush, int argc, char* argv[])
+  {
+    uint8_t version_major, version_minor, version_patch;
+
+    ush->get_version (version_major, version_minor, version_patch);
+    ush->printf ("Version %d.%d.%d\n", version_major, version_minor,
+                 version_patch);
+
+    return ush_ok;
+  }
+
+  //----------------------------------------------------------------------------
+
+  ush_help::ush_help (void)
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+    info_.command = "help";
+    info_.help_text = "List available commands";
+  }
+
+  ush_help::~ush_help ()
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+  }
+
+  int
+  ush_help::do_cmd (class ushell* ush, int argc, char* argv[])
+  {
+    ush->printf ("Following commands are available:\n");
+    class ushell_cmd** pclasses;
+    for (pclasses = ushell::ushell_cmds_; *pclasses != nullptr; pclasses++)
+      {
+        ush->printf ("  %-10s%s\n", (*pclasses)->get_cmd_info ()->command,
+                     (*pclasses)->get_cmd_info ()->help_text);
+      }
+    ush->printf ("For help on a specific command, type \"<cmd> -h\"\n");
+
+    return ush_ok;
+  }
+
+  //----------------------------------------------------------------------------
+
+  ush_quit::ush_quit (void)
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+    info_.command = "exit";
+    info_.help_text = "Exit (or restart) the ushell";
+  }
+
+  ush_quit::~ush_quit ()
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+  }
+
+  int
+  ush_quit::do_cmd (class ushell* ush, int argc, char* argv[])
+  {
+    return ush_exit;
+  }
+
+  //----------------------------------------------------------------------------
+
+  ush_test::ush_test (void)
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+    info_.command = "test";
+    info_.help_text = "This is a test command";
+  }
+
+  ush_test::~ush_test ()
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+  }
+
+  int
+  ush_test::do_cmd (class ushell* ush, int argc, char* argv[])
+  {
+    ush->printf ("Got %d arguments:\n", argc);
+
+    for (int i = 0; i < argc; i++)
+      {
+        ush->printf ("%s\n", argv[i]);
+      }
+
+    return ush_ok;
+  }
+
+  //----------------------------------------------------------------------------
+
+  // instantiate all command classes
+
+  ush_version version
+    { };
+
+  ush_quit quit
+    { };
+
+  ush_help help
+    { };
+
+  ush_test test
+    { };
 
 }
 
