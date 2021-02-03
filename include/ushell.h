@@ -30,8 +30,6 @@
 #ifndef INCLUDE_USHELL_H_
 #define INCLUDE_USHELL_H_
 
-#include <cmsis-plus/rtos/os.h>
-
 #include <tty-canonical.h>
 
 #if defined (__cplusplus)
@@ -110,7 +108,7 @@ namespace ushell
 
     static constexpr uint8_t VERSION_MAJOR = 0;
     static constexpr uint8_t VERSION_MINOR = 0;
-    static constexpr uint8_t VERSION_PATCH = 4;
+    static constexpr uint8_t VERSION_PATCH = 5;
 
     static constexpr int max_params = 10;
 
@@ -164,70 +162,6 @@ namespace ushell
 
     cmd_info_t info_;
     class ushell* ush;
-
-  };
-
-  //----------------------------------------------------------------------------
-
-  class ush_version : public ushell_cmd
-  {
-  public:
-
-    ush_version (void);
-
-    virtual
-    ~ush_version () noexcept;
-
-    virtual int
-    do_cmd (class ushell* ush, int argc, char* argv[]);
-
-  };
-
-  //----------------------------------------------------------------------------
-
-  class ush_help : public ushell_cmd
-  {
-  public:
-
-    ush_help (void);
-
-    virtual
-    ~ush_help () noexcept;
-
-    virtual int
-    do_cmd (class ushell* ush, int argc, char* argv[]);
-
-  };
-
-  //----------------------------------------------------------------------------
-
-  class ush_quit : public ushell_cmd
-  {
-  public:
-
-    ush_quit (void);
-
-    virtual
-    ~ush_quit () noexcept;
-
-    virtual int
-    do_cmd (class ushell* ush, int argc, char* argv[]);
-
-  };
-
-  //----------------------------------------------------------------------------
-
-  class ush_test : public ushell_cmd
-  {
-  public:
-
-    ush_test (void);
-
-    virtual
-    ~ush_test () noexcept;
-
-    virtual int
-    do_cmd (class ushell* ush, int argc, char* argv[]);
 
   };
 

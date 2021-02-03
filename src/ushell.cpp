@@ -30,7 +30,6 @@
 #include <cmsis-plus/rtos/os.h>
 #include <cmsis-plus/diag/trace.h>
 #include <cmsis-plus/posix-io/io.h>
-#include <stdarg.h>
 
 #include "ushell.h"
 
@@ -38,7 +37,6 @@ using namespace os;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 
 namespace ushell
 {
@@ -220,8 +218,9 @@ namespace ushell
   ushell::link_cmd (class ushell_cmd* ucmd)
   {
     bool result = false;
+    int i;
 
-    for (int i = 0; i < USH_MAX_COMMANDS; i++)
+    for (i = 0; i < USH_MAX_COMMANDS; i++)
       {
         if (ushell_cmds_[i] == nullptr)
           {
@@ -230,6 +229,9 @@ namespace ushell
             break;
           }
       }
+
+    // check if the table overflowed
+    assert(i < USH_MAX_COMMANDS);
 
     return result;
   }
@@ -252,124 +254,6 @@ namespace ushell
   {
     return &info_;
   }
-
-  //----------------------------------------------------------------------------
-
-  ush_version::ush_version (void)
-  {
-    trace::printf ("%s() %p\n", __func__, this);
-    info_.command = "ver";
-    info_.help_text = "Show the ushell version";
-  }
-
-  ush_version::~ush_version ()
-  {
-    trace::printf ("%s() %p\n", __func__, this);
-  }
-
-  int
-  ush_version::do_cmd (class ushell* ush, int argc, char* argv[])
-  {
-    uint8_t version_major, version_minor, version_patch;
-
-    ush->get_version (version_major, version_minor, version_patch);
-    ush->printf ("Version %d.%d.%d\n", version_major, version_minor,
-                 version_patch);
-
-    return ush_ok;
-  }
-
-  //----------------------------------------------------------------------------
-
-  ush_help::ush_help (void)
-  {
-    trace::printf ("%s() %p\n", __func__, this);
-    info_.command = "help";
-    info_.help_text = "List available commands";
-  }
-
-  ush_help::~ush_help ()
-  {
-    trace::printf ("%s() %p\n", __func__, this);
-  }
-
-  int
-  ush_help::do_cmd (class ushell* ush, int argc, char* argv[])
-  {
-    ush->printf ("Following commands are available:\n");
-    class ushell_cmd** pclasses;
-    for (pclasses = ushell::ushell_cmds_; *pclasses != nullptr; pclasses++)
-      {
-        ush->printf ("  %-10s%s\n", (*pclasses)->get_cmd_info ()->command,
-                     (*pclasses)->get_cmd_info ()->help_text);
-      }
-    ush->printf ("For help on a specific command, type \"<cmd> -h\"\n");
-
-    return ush_ok;
-  }
-
-  //----------------------------------------------------------------------------
-
-  ush_quit::ush_quit (void)
-  {
-    trace::printf ("%s() %p\n", __func__, this);
-    info_.command = "exit";
-    info_.help_text = "Exit (or restart) the ushell";
-  }
-
-  ush_quit::~ush_quit ()
-  {
-    trace::printf ("%s() %p\n", __func__, this);
-  }
-
-  int
-  ush_quit::do_cmd (class ushell* ush, int argc, char* argv[])
-  {
-    return ush_exit;
-  }
-
-  //----------------------------------------------------------------------------
-
-  ush_test::ush_test (void)
-  {
-    trace::printf ("%s() %p\n", __func__, this);
-    info_.command = "test";
-    info_.help_text = "This is a test command";
-  }
-
-  ush_test::~ush_test ()
-  {
-    trace::printf ("%s() %p\n", __func__, this);
-  }
-
-  int
-  ush_test::do_cmd (class ushell* ush, int argc, char* argv[])
-  {
-    ush->printf ("Got %d arguments:\n", argc);
-
-    for (int i = 0; i < argc; i++)
-      {
-        ush->printf ("%s\n", argv[i]);
-      }
-
-    return ush_ok;
-  }
-
-  //----------------------------------------------------------------------------
-
-  // instantiate all command classes
-
-  ush_version version
-    { };
-
-  ush_quit quit
-    { };
-
-  ush_help help
-    { };
-
-  ush_test test
-    { };
 
 }
 
