@@ -41,7 +41,7 @@ using namespace os::rtos;
 static void*
 ush_th (void* args);
 
-// set ush thread's stack size
+// set ushell's thread's stack size
 static constexpr std::size_t th_stack_size = 4096;
 
 #if STATIC_USHELL == true
@@ -70,11 +70,14 @@ static void*
 ush_th (void* args)
 {
 #if STATIC_USHELL == true
-  return ush_cdc0.ushell_th (nullptr);
+  while (true)
+    {
+      ush_cdc0.do_ushell (nullptr);
+    }
 #else
   ushell::ushell* ushc = new ushell::ushell { (char*) args };
 
-  void* ret = ushc->ushell_th (nullptr);
+  void* ret = ushc->do_ushell (nullptr);
   delete ushc;
 
   return ret;
@@ -82,5 +85,4 @@ ush_th (void* args)
 }
 
 #pragma GCC diagnostic pop
-
 
