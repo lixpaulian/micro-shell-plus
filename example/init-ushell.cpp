@@ -25,6 +25,13 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  * Created on: 22 Jan. 2021 (LNP)
+ *
+ * This is an example that describes how to launch the ushell, both statically
+ * and dynamically. If the definition STATIC_USHELL is set to true, then a
+ * ushell will be statically instantiated and launched, otherwise both the
+ * ushell class and its thread will be dynamically instantiated/launched.
+ * Obviously, a combination of both methods can be also used.
+ *
  */
 
 #include <cmsis-plus/rtos/os.h>
@@ -75,7 +82,8 @@ ush_th (void* args)
       ush_cdc0.do_ushell (nullptr);
     }
 #else
-  ushell::ushell* ushc = new ushell::ushell { (char*) args };
+  ushell::ushell* ushc = new ushell::ushell
+    { (char*) args };
 
   void* ret = ushc->do_ushell (nullptr);
   delete ushc;
