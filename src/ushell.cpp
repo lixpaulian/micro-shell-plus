@@ -100,7 +100,7 @@ namespace ushell
                           }
                         else if (result != ush_ok)
                           {
-                            printf ("Error %d\n", result);
+                            printf ("error %d\n", result);
                           }
                       }
                   }
@@ -151,6 +151,7 @@ namespace ushell
           }
         *pbuff++ = '\0'; // add terminator
         len--;
+        argv[0] = buff; // first argument is the command itself
 
         // iterate all linked command classes
         result = ush_cmd_not_found;
@@ -161,7 +162,7 @@ namespace ushell
                 int argc;
 
                 // valid command, parse parameters, if any
-                for (argc = 0; argc < max_params; argc++)
+                for (argc = 1; argc < max_params; argc++)
                   {
                     if (!len)
                       {
@@ -205,6 +206,7 @@ namespace ushell
                         len--;
                       }
                   }
+                argv[argc] = nullptr;
                 result = (*pclasses)->do_cmd (this, argc, argv);
                 break;
               }
@@ -249,7 +251,7 @@ namespace ushell
     trace::printf ("%s() %p\n", __func__, this);
   }
 
-  cmd_info_t*
+  ushell_cmd::cmd_info_t*
   ushell_cmd::get_cmd_info (void)
   {
     return &info_;
