@@ -1,7 +1,7 @@
 /*
  * ushell.h
  *
- * Copyright (c) 2020 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2021 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -30,7 +30,9 @@
 #ifndef INCLUDE_USHELL_H_
 #define INCLUDE_USHELL_H_
 
-#include <tty-canonical.h>
+#include <tty-canonical.h> // this is temporary, should be <tty.h>
+
+#include "ushell-opts.h"
 
 #if defined (__cplusplus)
 
@@ -42,18 +44,14 @@ namespace ushell
 {
   class ushell_cmd;
 
-  typedef struct
-  {
-    const char* command;
-    const char* help_text;
-  } cmd_info_t;
-
   typedef enum
   {
     ush_ok = 0,
     ush_cmd_not_found,
     ush_cmd_not_allowed,
-    ush_param_invalid = 5,
+    ush_option_invalid,
+    unused,
+    ush_param_invalid,
 
     ush_user_timeout = 98,
     ush_exit
@@ -61,6 +59,7 @@ namespace ushell
 
   class ushell
   {
+
   public:
 
     ushell (const char* char_device);
@@ -108,7 +107,7 @@ namespace ushell
 
     static constexpr uint8_t VERSION_MAJOR = 0;
     static constexpr uint8_t VERSION_MINOR = 0;
-    static constexpr uint8_t VERSION_PATCH = 5;
+    static constexpr uint8_t VERSION_PATCH = 7;
 
     static constexpr int max_params = 10;
 
@@ -155,10 +154,19 @@ namespace ushell
     virtual int
     do_cmd (class ushell* ush, int argc, char* argv[]) = 0;
 
+  protected:
+
+    friend class ushell;
+    friend class ush_help;
+
+    typedef struct
+    {
+      const char* command;
+      const char* help_text;
+    } cmd_info_t;
+
     cmd_info_t*
     get_cmd_info (void);
-
-  protected:
 
     cmd_info_t info_;
     class ushell* ush;
