@@ -37,8 +37,6 @@
 namespace ushell
 {
 
-  //----------------------------------------------------------------------------
-
   class ush_version : public ushell_cmd
   {
   public:
@@ -77,14 +75,14 @@ namespace ushell
 
   //----------------------------------------------------------------------------
 
-  class ush_help : public ushell_cmd
+  class ush_date : public ushell_cmd
   {
   public:
 
-    ush_help (void);
+    ush_date (void);
 
     virtual
-    ~ush_help () noexcept;
+    ~ush_date () noexcept;
 
     virtual int
     do_cmd (class ushell* ush, int argc, char* argv[]);
@@ -109,14 +107,14 @@ namespace ushell
 
   //----------------------------------------------------------------------------
 
-  class ush_test : public ushell_cmd
+  class ush_help : public ushell_cmd
   {
   public:
 
-    ush_test (void);
+    ush_help (void);
 
     virtual
-    ~ush_test () noexcept;
+    ~ush_help () noexcept;
 
     virtual int
     do_cmd (class ushell* ush, int argc, char* argv[]);
