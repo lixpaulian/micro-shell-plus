@@ -31,7 +31,10 @@
 #include <cmsis-plus/diag/trace.h>
 #include <cmsis-plus/posix-io/io.h>
 
+#include "readline.h"
 #include "ushell.h"
+
+#define USE_READLINE true
 
 using namespace os;
 
@@ -76,18 +79,38 @@ namespace ushell
           {
             // configure the tty in canonical mode
             memcpy (&tio_orig, &tio, sizeof(struct termios));
+
+#if USE_READLINE == true
+            tio.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON); //~(ICRNL | INPCK | ISTRIP | IXON);
+            tio.c_iflag |=  (IGNBRK);
+            tio.c_oflag |=  (OPOST | ONLCR);
+            tio.c_cflag |=  (CS8);
+            tio.c_lflag &= ~(ECHO | ICANON | IEXTEN); // | ISIG);
+            tio.c_cc[VMIN] = 1;
+            tio.c_cc[VTIME] = 0;
+
+            readline_init (NULL);
+            readline_history_load (RL_HISTORY_FILE);
+#else
             tio.c_lflag |= (ICANON | ECHO | ECHOE);
             tio.c_iflag |= (ICRNL | IMAXBEL);
             tio.c_oflag |= (OPOST | ONLCR);
             tio.c_cc[VEOF] = 4;   // ctrl-d
             tio.c_cc[VERASE] = '\b';
+#endif
+
             if (!((tty->tcsetattr (TCSANOW, &tio)) < 0))
               {
                 tty->write (greet, strlen (greet));
+
                 do
                   {
+#if USE_READLINE == true
+                    if ((c = readline (tty, prompt, buffer, sizeof(buffer))) > 0)
+#else
                     tty->write (prompt, strlen (prompt));
                     if ((c = tty->read (buffer, sizeof(buffer))) > 0)
+#endif
                       {
                         buffer[c] = '\0';
 
@@ -108,6 +131,9 @@ namespace ushell
 
                 // restore the original tty settings
                 tty->tcsetattr (TCSANOW, &tio_orig);
+#if USE_READLINE == true
+                readline_free ();
+#endif
               }
             tty->close ();
           }
