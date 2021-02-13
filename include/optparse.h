@@ -1,9 +1,9 @@
 /*
  * A C++ equivalent of the Unix getopt() call.
  *
- * This file, as well as the associated code file (.cpp) are based on work
- * done by Christopher Wellons <skeeto>. The original UNLICENSE also applies to
- * this code. See also <https://github.com/skeeto/optparse>.
+ * This file, as well as the associated code file (optparse.cpp) is based
+ * on work done by Christopher Wellons <skeeto>. The original UNLICENSE
+ * also applies to this code. See also <https://github.com/skeeto/optparse>.
  *
  * Lix N. Paulian (lix@paulian.net), 6 February 2021
  *

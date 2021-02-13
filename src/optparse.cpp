@@ -28,7 +28,7 @@
  *
  * For more information, please refer to <http://unlicense.org/>
  *
- * This file, as well as the associated header file are based on work done
+ * This file, as well as the associated header file is based on work done
  * by Christopher Wellons <skeeto>. The original UNLICENSE also applies to
  * this code. See also <https://github.com/skeeto/optparse>.
  *
