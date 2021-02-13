@@ -34,7 +34,13 @@
 #include "readline.h"
 #include "ushell.h"
 
+#if !defined USE_READLINE
 #define USE_READLINE true
+#endif
+
+#if !defined SHELL_PROMPT
+#define SHELL_PROMPT ": "
+#endif
 
 using namespace os;
 
@@ -66,7 +72,7 @@ namespace ushell
     char greet[] =
       { "\nType \"help\" for the list of available commands\n" };
     char prompt[] =
-      { ": " };
+      { SHELL_PROMPT };
 
     tty = static_cast<posix::tty_canonical*> (posix::open (char_device_, 0));
     if (tty != nullptr)
@@ -89,8 +95,8 @@ namespace ushell
             tio.c_cc[VMIN] = 1;
             tio.c_cc[VTIME] = 0;
 
-            readline_init (NULL);
-            readline_history_load (RL_HISTORY_FILE);
+            read_line rl { tty, nullptr };
+            rl.history_load (nullptr);
 #else
             tio.c_lflag |= (ICANON | ECHO | ECHOE);
             tio.c_iflag |= (ICRNL | IMAXBEL);
@@ -106,7 +112,7 @@ namespace ushell
                 do
                   {
 #if USE_READLINE == true
-                    if ((c = readline (tty, prompt, buffer, sizeof(buffer))) > 0)
+                    if ((c = rl.readline (prompt, buffer, sizeof(buffer))) > 0)
 #else
                     tty->write (prompt, strlen (prompt));
                     if ((c = tty->read (buffer, sizeof(buffer))) > 0)
@@ -132,7 +138,7 @@ namespace ushell
                 // restore the original tty settings
                 tty->tcsetattr (TCSANOW, &tio_orig);
 #if USE_READLINE == true
-                readline_free ();
+                rl.history_free ();
 #endif
               }
             tty->close ();
