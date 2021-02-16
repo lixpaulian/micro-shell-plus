@@ -103,11 +103,11 @@ namespace ushell
   private:
 
     int
-    cmd_parser (char* buff, ssize_t len);
+    cmd_parser (char* buff);
 
     static constexpr uint8_t VERSION_MAJOR = 0;
     static constexpr uint8_t VERSION_MINOR = 0;
-    static constexpr uint8_t VERSION_PATCH = 8;
+    static constexpr uint8_t VERSION_PATCH = 9;
 
     static constexpr int max_params = 10;
 
