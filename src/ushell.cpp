@@ -38,9 +38,18 @@
 #define USE_READLINE true
 #endif
 
+#if !defined SHELL_GREET
+#define SHELL_GREET "\nType \"help\" for the list of available commands\n"
+#endif
+
 #if !defined SHELL_PROMPT
 #define SHELL_PROMPT ": "
 #endif
+
+#if !defined SHELL_MAX_LINE_LEN
+#define SHELL_MAX_LINE_LEN 256
+#endif
+
 
 using namespace os;
 
@@ -68,9 +77,9 @@ namespace ushell
   ushell::do_ushell (void* args)
   {
     int c;
-    char buffer[256];
+    char buffer[SHELL_MAX_LINE_LEN], * p;
     char greet[] =
-      { "\nType \"help\" for the list of available commands\n" };
+      { SHELL_GREET };
     char prompt[] =
       { SHELL_PROMPT };
 
@@ -118,10 +127,20 @@ namespace ushell
                     if ((c = tty->read (buffer, sizeof(buffer))) > 0)
 #endif
                       {
-                        buffer[c] = '\0';
+                        p = buffer;
+                        for (int n = 0; n < c; n++, p++)
+                          {
+                            if (*p == '\r' || *p == '\n' || *p == '\0')
+                              {
+                                break;
+                              }
+                          }
+
+                        // clear buffer to end
+                        memset (p, 0, sizeof (buffer) - c);
 
                         // parse and execute command
-                        int result = cmd_parser (buffer, c);
+                        int result = cmd_parser (buffer);
                         if (result == ush_exit)
                           {
                             // exit command, we must leave now
@@ -138,7 +157,7 @@ namespace ushell
                 // restore the original tty settings
                 tty->tcsetattr (TCSANOW, &tio_orig);
 #if USE_READLINE == true
-                rl.history_free ();
+                rl.history_save ();
 #endif
               }
             tty->close ();
@@ -165,24 +184,23 @@ namespace ushell
   //----------------------------------------------------------------------------
 
   int
-  ushell::cmd_parser (char* buff, ssize_t len)
+  ushell::cmd_parser (char* buff)
   {
     class ushell_cmd** pclasses;
     char* pbuff;
     char* argv[max_params];
     int result = ush_ok;
 
-    if (len > 1) // ignore empty strings, at least two chars are expected
+    if (*buff != '\0') // ignore empty strings, at least one character is expected
       {
         pbuff = buff;
 
         // extract the command
-        while (*pbuff != ' ' && *pbuff != '\0' && *pbuff != '\n' && len--)
+        while (*pbuff != ' ' && *pbuff != '\0')
           {
             pbuff++;
           }
         *pbuff++ = '\0'; // add terminator
-        len--;
         argv[0] = buff; // first argument is the command itself
 
         // iterate all linked command classes
@@ -196,46 +214,40 @@ namespace ushell
                 // valid command, parse parameters, if any
                 for (argc = 1; argc < max_params; argc++)
                   {
-                    if (!len)
+                    if (*pbuff == '\0')
                       {
                         break;          // end of line reached
                       }
                     if (*pbuff == '\"')
                       {
                         pbuff++;        // skip the "
-                        len--;
                         argv[argc] = pbuff;
-                        while (*pbuff != '\"' && *pbuff != '\0'
-                            && *pbuff != '\n' && len--)
+                        while (*pbuff != '\"' && *pbuff != '\0')
                           {
                             pbuff++;
                           }
                         *pbuff++ = '\0';
-                        len--;
-                        if (len--)      // if not end of line...
+                        if (*pbuff != '\0')  // if not end of line...
                           {
                             pbuff++;    // skip the trailing space
                           }
                       }
                     else
                       {
-                        while ((*pbuff == ' ' || *pbuff == '\t'
-                            || *pbuff == '\n') && len--)
+                        while (*pbuff == ' ' || *pbuff == '\t')
                           {
-                            pbuff++;    // skip possible leading white spaces
+                            pbuff++;    // skip leading white spaces, if any
                           }
-                        if (len <= 0)
+                        if (*pbuff == '\0')
                           {
-                            break;
+                            break;      // end of line, exit
                           }
                         argv[argc] = pbuff;
-                        while (*pbuff != ' ' && *pbuff != '\0' && *pbuff != '\n'
-                            && len--)
+                        while (*pbuff != ' ' && *pbuff != '\0')
                           {
                             pbuff++;
                           }
                         *pbuff++ = '\0';
-                        len--;
                       }
                   }
                 argv[argc] = nullptr;
