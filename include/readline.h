@@ -1,4 +1,3 @@
-
 /*
  * readline.h
  *
@@ -12,7 +11,6 @@
  *
  * The original copyright notice follows.
  */
-
 
 /* MIT License
 
@@ -87,7 +85,7 @@ namespace ushell
     history_load (char const* file);
 
     void
-    history_free (void);
+    history_save (void);
 
   private:
 
@@ -95,12 +93,6 @@ namespace ushell
 
     bool
     exec_seq (char* seq);
-
-    void
-    history_save (void);
-
-    void
-    history_empty (void);
 
     void
     history_add (char const* string);
@@ -133,9 +125,6 @@ namespace ushell
     write_part (int start, int length);
 
     void
-    history_pop (int idx);
-
-    void
     set_text (char const* text, int redraw);
 
     void
@@ -147,13 +136,14 @@ namespace ushell
     void
     delete_n (int count);
 
-    typedef struct rl_history
+    typedef struct hist_header
     {
-      char const* file;
-      char* line;
-      char* lines[RL_HISTORY_HEIGHT];
-      int size, current;
-    } rl_history_t;
+      int16_t prev;
+      int16_t next;
+    } hh_t;
+
+    char history_[1024];
+    char* current_ = history_;
 
     char* raw_ = nullptr;       // raw buffer, utf-8
     size_t raw_len_ = 0;        // length of the raw buffer
@@ -163,11 +153,11 @@ namespace ushell
 
     bool finish_ = false;
 
-    rl_history_t history_;
-
     os::posix::tty_canonical* tty_;
 
     rl_get_completion_fn* get_completion_;
+
+    static constexpr const char* bs = "\b";
 
     //--------------------------------------------------------------------------
 

@@ -1,4 +1,3 @@
-
 /*
  * readline.cpp
  *
@@ -50,19 +49,11 @@
 
  */
 
-
 #include <cmsis-plus/rtos/os.h>
 #include <cmsis-plus/diag/trace.h>
 #include <cmsis-plus/posix/termios.h>
 
 #include "readline.h"
-
-#ifdef RL_HISTORY_FILE
-# include <sys/stat.h>
-# include <fcntl.h>
-#endif
-
-#define CUR_LEFT   "\b"
 
 #ifndef countof
 # define countof(arr)  (sizeof(arr)/sizeof(arr[0]))
@@ -77,7 +68,6 @@ namespace ushell
       get_completion_
         { gc }
   {
-    memset ((void*) &history_, 0, sizeof(rl_history_t));
   }
 
   read_line::~read_line ()
@@ -133,7 +123,7 @@ namespace ushell
     return glyph;
   }
 
-  /* ------------------------------------<------------------------------------- */
+  /* -------------------------------------------------------------------------- */
   read_line::rl_glyph_t*
   read_line::utf8tog (rl_glyph_t* glyphs, char const* raw)
   {
@@ -244,13 +234,13 @@ namespace ushell
       {
         while (count++)
           {
-            out (CUR_LEFT, strlen (CUR_LEFT));
+            out (bs, strlen (bs));
           }
       }
     else if (count > 0)
       {
         char buf[RL_MAX_LENGTH * 3];
-        char* to = gtoutf8 (buf, (rl_glyph_t*) (line_ + cur_pos_), count);
+        char* to = gtoutf8 (buf, line_ + cur_pos_, count);
         if (to != buf)
           {
             out (buf, to - buf);
@@ -265,7 +255,7 @@ namespace ushell
   {
     int c = afterspace;
     char buf[RL_MAX_LENGTH * 3];
-    char* to = gtoutf8 (buf, (rl_glyph_t*) (line_ + cur_pos_), -1);
+    char* to = gtoutf8 (buf, line_ + cur_pos_, -1);
 
     while (c--)
       {
@@ -290,43 +280,12 @@ namespace ushell
   read_line::write_part (int start, int length)
   {
     char buf[RL_MAX_LENGTH * 2];
-    char* to = gtoutf8 (buf, (rl_glyph_t*) (line_ + start), length);
+    char* to = gtoutf8 (buf, line_ + start, length);
 
     if (to != buf)
       {
         out (buf, to - buf);
       }
-  }
-
-  /* -------------------------------------------------------------------------- */
-  void
-  read_line::history_pop (int idx)
-  {
-    rl_history_t* h = &history_;
-
-    if (idx == h->size)
-      {
-        if (h->line)
-          {
-            set_text (h->line, 1);
-            free (h->line);
-            h->line = NULL;
-            return;
-          }
-      }
-
-    if (idx >= h->size)
-      {
-        return;
-      }
-
-    if (!h->line)
-      {
-        gtoutf8 (raw_, line_, -1);
-        h->line = strdup (raw_);
-      }
-
-    set_text (h->lines[idx], 1);
   }
 
   /* -------------------------------------------------------------------------- */
@@ -340,9 +299,9 @@ namespace ushell
 
     int oldlen = length_;
 
-    strncpy (raw_, text, raw_len_ - 1);
-    raw_[strlen(raw_) - 1] = '\0';      // remove the ending '\n'
-    rl_glyph_t* end = utf8tog ((rl_glyph_t*) line_, raw_);
+    strncpy (raw_, text, std::min (strlen (text) + 1, raw_len_ - 1));
+    raw_[raw_len_ - 1] = '\0'; // make sure we have a terminator
+    rl_glyph_t* end = utf8tog (line_, raw_);
     length_ = cur_pos_ = end - line_;
 
     if (redraw)
@@ -454,131 +413,64 @@ namespace ushell
 
   /* -------------------------------------------------------------------------- */
   void
-  read_line::history_save (void)
+  read_line::history_load (char const* file) // todo: load history file
   {
-    char const* file = history_.file;
+    hh_t hh;
 
-    if (!file)
-      {
-        return;
-      }
+    // add empty entry
+    hh.prev = 0;
+    hh.next = sizeof(hh_t) + 1;
+    memcpy (history_, &hh, sizeof(hh_t));
+    history_[sizeof(hh_t)] = '\0';
 
-    int fd = open (file, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-    if (fd < 0)
-      return;
-
-    rl_history_t* h = &history_;
-    int c = h->size;
-    char** pos = h->lines;
-    while (c--)
-      {
-        if (write (fd, pos[0], strlen (pos[0])) < 0 || write (fd, "\n", 1) < 0)
-          break;
-        ++pos;
-      }
-
-    close (fd);
+    // add behind the empty entry an "end of history" entry
+    hh.next = 0;
+    memcpy (history_ + sizeof(hh_t) + 1, &hh, sizeof(hh_t));
+    current_ = history_;
   }
 
   /* -------------------------------------------------------------------------- */
   void
-  read_line::history_empty (void)
+  read_line::history_save (void)
   {
-    rl_history_t* h = &history_;
-    int c = h->size;
-    char** pos = h->lines;
-
-    while (c--)
-      {
-        free (*pos);
-        *pos++ = NULL;
-      }
-    h->size = 0;
   }
 
   /* -------------------------------------------------------------------------- */
   void
   read_line::history_add (char const* string)
   {
-    rl_history_t* h = &history_;
-
-    free (h->line);
-    h->line = NULL;
-    if (!string[0])
+    if (*string)
       {
-        return;
-      }
+        hh_t hh;
+        char* p = history_ + sizeof(hh_t) + 1; // skip the empty entry
 
-    if (h->size && !strcmp (h->lines[h->size - 1], string))
-      {
-        h->current = h->size;
-        return;
-      }
-
-    if (h->size >= (int) countof(h->lines))
-      {
-        free (h->lines[0]);
-        memmove (h->lines, h->lines + 1, sizeof(h->lines[0]) * --(h->size));
-      }
-    h->lines[h->size++] = strdup (string);
-    h->current = h->size;
-  }
-
-  /* -------------------------------------------------------------------------- */
-  void
-  read_line::history_load (char const* file)
-  {
-    if (!file)
-      {
-        file = RL_HISTORY_FILE;
-      }
-
-    history_.file = file;
-
-    history_empty ();
-
-    int fd = open (file, O_RDONLY);
-    if (fd < 0)
-      return;
-
-    char line[RL_MAX_LENGTH * 2 + 4];
-    char* in = line, * iend = line + sizeof(line) - 1;
-    int count;
-
-    while ((count = read (fd, in, iend - in)) > 0)
-      {
-        char* eoln, * end = in + count;
-        for (eoln = in; eoln < end; ++eoln)
+        memcpy (&hh, p, sizeof(hh_t));
+        if (strncmp (p + sizeof(hh_t), string, strlen (string)))
           {
-            if (*eoln == '\n')
-              {
-                *eoln = 0;
-                history_add (in);
-                in = eoln + 1;
-              }
+            size_t rec_len = sizeof(hh_t) + strlen (string) + 1; // + null terminator
+            hh.prev = rec_len;
+            memcpy (p, &hh, sizeof(hh_t));
+
+            // shift memory up to make space for the new entry
+            memmove (p + rec_len, p,
+                     sizeof(history_) - (rec_len + sizeof(hh_t) + 1));
+
+            hh.prev = sizeof(hh_t) + 1;
+            hh.next = rec_len;
+            memcpy (p, &hh, sizeof(hh_t));
+            memcpy (p + sizeof(hh_t), string, strlen (string));
+            p[rec_len - 1] = '\0';  // insert null terminator
+            current_ = history_;     // reset history pointer
           }
-        if (in < end)
-          {
-            memmove (line, in, iend - in);
-          }
-        in = line + (iend - in);
       }
-
-    close (fd);
-  }
-
-  /* -------------------------------------------------------------------------- */
-  void
-  read_line::history_free (void)
-  {
-    history_save ();
-    history_empty ();
   }
 
   /* -------------------------------------------------------------------------- */
   int
   read_line::readline (char const* prompt, void* buff, size_t len)
   {
+    const char nl[] =
+      { "\n" };
     raw_[0] = 0;
     line_[0] = 0;
     length_ = cur_pos_ = finish_ = 0;
@@ -608,6 +500,7 @@ namespace ushell
       }
 
     cursor_end (this);
+    out (nl, strlen (nl));
     gtoutf8 (raw_, line_, -1);
     history_add (raw_);
     return strlen (raw_);
@@ -747,10 +640,27 @@ namespace ushell
   void
   read_line::history_back (class read_line* self)
   {
-    rl_history_t* h = &self->history_;
-    if (h->current)
+    hh_t hh;
+
+    memcpy (&hh, self->current_, sizeof(hh_t));
+    if (hh.next)
       {
-        self->history_pop (--(h->current));
+        if ((self->current_ + hh.next)
+            < (self->history_ + sizeof(self->history_) - sizeof(hh_t)))
+          {
+            self->current_ += hh.next;
+            memcpy (&hh, self->current_, sizeof(hh_t));
+            if (hh.next != 0
+                && ((self->current_ + hh.next)
+                    < (self->history_ + sizeof(self->history_))))
+              {
+                self->set_text (self->current_ + sizeof(hh_t), 1);
+              }
+            else
+              {
+                self->current_ -= hh.prev; // turn back
+              }
+          }
       }
   }
 
@@ -758,10 +668,17 @@ namespace ushell
   void
   read_line::history_forward (class read_line* self)
   {
-    rl_history_t* h = &self->history_;
-    if (h->current < h->size)
+    hh_t hh;
+
+    memcpy (&hh, self->current_, sizeof(hh_t));
+
+    if (hh.prev)
       {
-        self->history_pop (++(h->current));
+        if ((self->current_ - hh.prev) >= self->history_)
+          {
+            self->current_ -= hh.prev;
+            self->set_text (self->current_ + sizeof(hh_t), 1);
+          }
       }
   }
 
@@ -769,32 +686,45 @@ namespace ushell
   void
   read_line::history_begin (class read_line* self)
   {
-    rl_history_t* h = &self->history_;
-    if (h->current)
+    hh_t hh;
+    char* savep = self->current_;
+
+    while (true)
       {
-        self->history_pop ((h->current = 0));
+        memcpy (&hh, self->current_, sizeof(hh_t));
+        if (hh.next)
+          {
+            if ((self->current_ + hh.next)
+                < (self->history_ + sizeof(self->history_) - sizeof(hh_t)))
+              {
+                savep = self->current_;
+                self->current_ += hh.next;
+                memcpy (&hh, self->current_, sizeof(hh_t));
+                if (hh.next == 0
+                    || ((self->current_ + hh.next)
+                        >= (self->history_ + sizeof(self->history_))))
+                  {
+                    break;
+                  }
+              }
+          }
       }
+    self->current_ = savep;
+    self->set_text (self->current_ + sizeof(hh_t), 1);
   }
 
   /* -------------------------------------------------------------------------- */
   void
   read_line::history_end (class read_line* self)
   {
-    rl_history_t* h = &self->history_;
-    if (h->current < h->size)
-      {
-        self->history_pop ((h->current = h->size));
-      }
+    self->current_ = self->history_;
+    self->set_text (self->current_ + sizeof(hh_t), 1);
   }
 
   /* -------------------------------------------------------------------------- */
   void
   read_line::enter (class read_line* self)
   {
-    const char nl[] =
-      { "\n" };
-
-    self->insert_seq (nl);
     self->finish_ = true;
   }
 
