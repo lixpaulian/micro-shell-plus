@@ -44,8 +44,8 @@
  * without a space in between, e.g. -d3 or -d 3.
  *
  * The API is similar to the original version, however the parser must be
- * instantiated before use. After the opt_parse object, all known functions
- * and variables becomes accessible:
+ * instantiated before use. After the opt_parse object is instantiated,
+ * all known "getopt" functions and variables become accessible:
  *
  *      opt_parse getopt { argc, argv };
  *      int ch;
