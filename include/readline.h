@@ -63,7 +63,7 @@ namespace ushell
     char const*
     (rl_get_completion_fn) (char const* start, char const* cur_pos);
 
-    read_line (os::posix::tty_canonical* tty, rl_get_completion_fn gc);
+    read_line (rl_get_completion_fn gc);
 
     read_line (const read_line&) = delete;
 
@@ -78,14 +78,14 @@ namespace ushell
     virtual
     ~read_line () noexcept;
 
+    void
+    init (os::posix::tty_canonical* tty, char const* file);
+
     int
     readline (char const* prompt, void* buff, size_t len);
 
     void
-    history_load (char const* file);
-
-    void
-    history_save (void);
+    end (void);
 
   private:
 
@@ -107,7 +107,7 @@ namespace ushell
     utf8tog (rl_glyph_t* glyphs, char const* raw);
 
     int
-    utf8_width (char const* raw);
+    one_gtoutf8 (char* raw, rl_glyph_t glyph);
 
     char*
     gtoutf8 (char* raw, rl_glyph_t const* glyphs, int count);
@@ -148,12 +148,12 @@ namespace ushell
     char* raw_ = nullptr;       // raw buffer, utf-8
     size_t raw_len_ = 0;        // length of the raw buffer
 
-    rl_glyph_t line_[RL_MAX_LENGTH]; // unicode buffer
-    int length_ = 0, cur_pos_ = 0; // length and position in glyphs
+    rl_glyph_t line_[RL_MAX_LENGTH];    // unicode buffer
+    int length_ = 0, cur_pos_ = 0;      // length and position in glyphs
 
     bool finish_ = false;
 
-    os::posix::tty_canonical* tty_;
+    os::posix::tty_canonical* tty_ = nullptr;
 
     rl_get_completion_fn* get_completion_;
 

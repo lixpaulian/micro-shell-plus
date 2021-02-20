@@ -62,9 +62,7 @@
 namespace ushell
 {
 
-  read_line::read_line (os::posix::tty_canonical* tty, rl_get_completion_fn gc) :
-      tty_
-        { tty }, //
+  read_line::read_line (rl_get_completion_fn gc) :
       get_completion_
         { gc }
   {
@@ -74,7 +72,103 @@ namespace ushell
   {
   }
 
-  /* -------------------------------------------------------------------------- */
+  void
+  read_line::init (os::posix::tty_canonical* tty, char const* file) // todo: load history file
+  {
+    hh_t hh;
+
+    // init tty
+    tty_ = tty;
+
+    // init the history, first add an empty entry
+    hh.prev = 0;
+    hh.next = sizeof(hh_t) + 1;
+    memcpy (history_, &hh, sizeof(hh_t));
+    history_[sizeof(hh_t)] = '\0';
+
+    // add behind the empty entry an "end of history" entry
+    hh.next = 0;
+    memcpy (history_ + sizeof(hh_t) + 1, &hh, sizeof(hh_t));
+    current_ = history_;
+  }
+
+  int
+  read_line::readline (char const* prompt, void* buff, size_t len)
+  {
+    const char nl[] =
+      { "\n" };
+    length_ = cur_pos_ = 0;
+    finish_ = false;
+    raw_ = (char*) buff;
+    raw_len_ = len;
+    raw_[0] = '\0';
+    line_[0] = '\0';
+
+    out (prompt, strlen (prompt));
+
+    char ch, seq[12], * seqpos = seq;
+    while (tty_->read (&ch, 1) > 0)
+      {
+        if (seqpos >= seq + sizeof(seq))
+          {
+            seqpos = seq; // wrong sequence -- wrong reaction :)
+          }
+        *seqpos++ = ch;
+        *seqpos = 0;
+        if (!skip_char_seq (seq))
+          {
+            continue;   // wrong seq
+          }
+        if (exec_seq (seq))
+          {
+            break;      // finish
+          }
+        seqpos = seq;
+      }
+
+    cursor_end (this);
+    out (nl, strlen (nl));
+    gtoutf8 (raw_, line_, -1);
+    history_add (raw_);
+    return strlen (raw_);
+  }
+
+  void
+  read_line::end (void)
+  {
+    // TODO clean-up
+  }
+
+  //----------------------------------------------------------------------------
+
+  void
+  read_line::history_add (char const* string)
+  {
+    if (*string)
+      {
+        hh_t hh;
+        char* p = history_ + sizeof(hh_t) + 1; // skip the empty entry
+
+        memcpy (&hh, p, sizeof(hh_t));
+        if (strncmp (p + sizeof(hh_t), string, strlen (string)))
+          {
+            size_t rec_len = sizeof(hh_t) + strlen (string) + 1; // + null terminator
+            hh.prev = rec_len;
+            memcpy (p, &hh, sizeof(hh_t));
+
+            // shift memory up to make space for the new entry
+            memmove (p + rec_len, p,
+                     sizeof(history_) - (rec_len + sizeof(hh_t) + 1));
+
+            hh.prev = sizeof(hh_t) + 1;
+            hh.next = rec_len;
+            memcpy (p, &hh, sizeof(hh_t));
+            memcpy (p + sizeof(hh_t), string, strlen (string));
+            p[rec_len - 1] = '\0';      // insert null terminator
+            current_ = history_;        // reset history pointer
+          }
+      }
+  }
 
   int
   read_line::out (const char* data, int size)
@@ -82,7 +176,6 @@ namespace ushell
     return tty_->write (data, size);
   }
 
-  /* -------------------------------------------------------------------------- */
   read_line::rl_glyph_t
   read_line::utf8_to_glyph (char const** utf8)
   {
@@ -123,7 +216,6 @@ namespace ushell
     return glyph;
   }
 
-  /* -------------------------------------------------------------------------- */
   read_line::rl_glyph_t*
   read_line::utf8tog (rl_glyph_t* glyphs, char const* raw)
   {
@@ -144,51 +236,50 @@ namespace ushell
     return glyphs;
   }
 
-  /* -------------------------------------------------------------------------- */
   int
-  read_line::utf8_width (char const* raw)
+  read_line::one_gtoutf8 (char* raw, rl_glyph_t glyph)
   {
     int count = 0;
-    while (*raw)
-      {
-        if (!utf8_to_glyph (&raw))
-          {
-            ++raw; // skip a char of wrong utf8 sequence
-          }
-        ++count;
-      }
 
-    return count;
-  }
-
-  /* -------------------------------------------------------------------------- */
-  char*
-  read_line::gtoutf8 (char* raw, rl_glyph_t const* glyphs, int count)
-  {
-    while (*glyphs && count--)
+    if (glyph)
       {
-        unsigned int uc = *glyphs++;
-        if (!(uc & 0xFF80))
+        if (!(glyph & 0xFF80))
           {
-            *raw++ = uc;
+            *raw++ = glyph;
+            count = 1;
           }
-        else if (!(uc & 0xF800))
+        else if (!(glyph & 0xF800))
           {
-            *raw++ = 0xC0 | (uc >> 6);
-            *raw++ = 0x80 | (uc & 0x3F);
+            *raw++ = 0xC0 | (glyph >> 6);
+            *raw++ = 0x80 | (glyph & 0x3F);
+            count = 2;
           }
         else
           {
-            *raw++ = 0xE0 | (uc >> 12);
-            *raw++ = 0x80 | (0x3F & uc >> 6);
-            *raw++ = 0x80 | (0x3F & uc);
+            *raw++ = 0xE0 | (glyph >> 12);
+            *raw++ = 0x80 | (0x3F & glyph >> 6);
+            *raw++ = 0x80 | (0x3F & glyph);
+            count = 3;
           }
+      }
+    *raw = 0;
+    return count;
+  }
+
+  char*
+  read_line::gtoutf8 (char* raw, rl_glyph_t const* glyphs, int count)
+  {
+    int n = 0;
+
+    while (*glyphs && count--)
+      {
+        n = one_gtoutf8 (raw, *glyphs++);
+        raw += n;
       }
     *raw = 0;
     return raw;
   }
 
-  /* -------------------------------------------------------------------------- */
   int
   read_line::skip_char_seq (char const* start)
   {
@@ -226,7 +317,6 @@ namespace ushell
     return 0; // not closed sequence
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::move (int count)
   {
@@ -239,33 +329,42 @@ namespace ushell
       }
     else if (count > 0)
       {
-        char buf[RL_MAX_LENGTH * 3];
-        char* to = gtoutf8 (buf, line_ + cur_pos_, count);
-        if (to != buf)
+        char buf[4];
+        rl_glyph_t* gl = line_ + cur_pos_;
+
+        while (count-- && *gl)
           {
-            out (buf, to - buf);
+            int n = one_gtoutf8 (buf, *gl++);
+            if (n)
+              {
+                out (buf, n);
+              }
           }
       }
     return;
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::update_tail (int afterspace)
   {
     int c = afterspace;
-    char buf[RL_MAX_LENGTH * 3];
-    char* to = gtoutf8 (buf, line_ + cur_pos_, -1);
+    char buf[4];
+    rl_glyph_t* gl = line_ + cur_pos_;
 
+    while (*gl)
+      {
+        int n = one_gtoutf8 (buf, *gl++);
+        if (n)
+          {
+            out (buf, n);
+          }
+      }
+    buf[0] = ' ';
     while (c--)
       {
-        *to++ = ' ';
+        out (buf, 1);
       }
-    *to = 0;
-    if (to != buf)
-      {
-        out (buf, to - buf);
-      }
+
     c = afterspace + length_ - cur_pos_;
     if (c > 0)
       {
@@ -275,20 +374,22 @@ namespace ushell
       }
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::write_part (int start, int length)
   {
-    char buf[RL_MAX_LENGTH * 2];
-    char* to = gtoutf8 (buf, line_ + start, length);
+    char buf[4];
+    rl_glyph_t* gl = line_ + start;
 
-    if (to != buf)
+    while (length-- && *gl)
       {
-        out (buf, to - buf);
+        int n = one_gtoutf8 (buf, *gl++);
+        if (n)
+          {
+            out (buf, n);
+          }
       }
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::set_text (char const* text, int redraw)
   {
@@ -314,13 +415,13 @@ namespace ushell
       }
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::insert_seq (char const* seq)
   {
     rl_glyph_t uc[RL_MAX_LENGTH * 2];
     rl_glyph_t* end = utf8tog (uc, seq);
     int count = end - uc;
+    os::trace::printf ("seq %d\n", count);
     int max_count = countof(line_) - length_ - 1;
 
     if (count > max_count)
@@ -349,7 +450,6 @@ namespace ushell
     update_tail (0);
   }
 
-  /* -------------------------------------------------------------------------- */
   bool
   read_line::exec_seq (char* seq)
   {
@@ -374,7 +474,6 @@ namespace ushell
     return finish_;
   }
 
-  /* -------------------------------------------------------------------------- */
   int
   read_line::next_word (void)
   {
@@ -393,7 +492,6 @@ namespace ushell
     return pos;
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::delete_n (int count)
   {
@@ -411,104 +509,8 @@ namespace ushell
       }
   }
 
-  /* -------------------------------------------------------------------------- */
-  void
-  read_line::history_load (char const* file) // todo: load history file
-  {
-    hh_t hh;
-
-    // add empty entry
-    hh.prev = 0;
-    hh.next = sizeof(hh_t) + 1;
-    memcpy (history_, &hh, sizeof(hh_t));
-    history_[sizeof(hh_t)] = '\0';
-
-    // add behind the empty entry an "end of history" entry
-    hh.next = 0;
-    memcpy (history_ + sizeof(hh_t) + 1, &hh, sizeof(hh_t));
-    current_ = history_;
-  }
-
-  /* -------------------------------------------------------------------------- */
-  void
-  read_line::history_save (void)
-  {
-  }
-
-  /* -------------------------------------------------------------------------- */
-  void
-  read_line::history_add (char const* string)
-  {
-    if (*string)
-      {
-        hh_t hh;
-        char* p = history_ + sizeof(hh_t) + 1; // skip the empty entry
-
-        memcpy (&hh, p, sizeof(hh_t));
-        if (strncmp (p + sizeof(hh_t), string, strlen (string)))
-          {
-            size_t rec_len = sizeof(hh_t) + strlen (string) + 1; // + null terminator
-            hh.prev = rec_len;
-            memcpy (p, &hh, sizeof(hh_t));
-
-            // shift memory up to make space for the new entry
-            memmove (p + rec_len, p,
-                     sizeof(history_) - (rec_len + sizeof(hh_t) + 1));
-
-            hh.prev = sizeof(hh_t) + 1;
-            hh.next = rec_len;
-            memcpy (p, &hh, sizeof(hh_t));
-            memcpy (p + sizeof(hh_t), string, strlen (string));
-            p[rec_len - 1] = '\0';  // insert null terminator
-            current_ = history_;     // reset history pointer
-          }
-      }
-  }
-
-  /* -------------------------------------------------------------------------- */
-  int
-  read_line::readline (char const* prompt, void* buff, size_t len)
-  {
-    const char nl[] =
-      { "\n" };
-    raw_[0] = 0;
-    line_[0] = 0;
-    length_ = cur_pos_ = finish_ = 0;
-    raw_ = (char*) buff;
-    raw_len_ = len;
-
-    out (prompt, strlen (prompt));
-
-    char ch, seq[12], * seqpos = seq;
-    while (tty_->read (&ch, 1) > 0)
-      {
-        if (seqpos >= seq + sizeof(seq))
-          {
-            seqpos = seq; // wrong sequence -- wrong reaction :)
-          }
-        *seqpos++ = ch;
-        *seqpos = 0;
-        if (!skip_char_seq (seq))
-          {
-            continue;   // wrong seq
-          }
-        if (exec_seq (seq))
-          {
-            break;      // finish
-          }
-        seqpos = seq;
-      }
-
-    cursor_end (this);
-    out (nl, strlen (nl));
-    gtoutf8 (raw_, line_, -1);
-    history_add (raw_);
-    return strlen (raw_);
-  }
-
   //----------------------------------------------------------------------------
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::cursor_home (class read_line* self)
   {
@@ -516,7 +518,6 @@ namespace ushell
     self->cur_pos_ = 0;
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::cursor_end (class read_line* self)
   {
@@ -524,7 +525,6 @@ namespace ushell
     self->cur_pos_ = self->length_;
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::cursor_left (class read_line* self)
   {
@@ -535,7 +535,6 @@ namespace ushell
       }
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::cursor_right (class read_line* self)
   {
@@ -545,7 +544,6 @@ namespace ushell
       }
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::cursor_word_left (class read_line* self)
   {
@@ -570,7 +568,6 @@ namespace ushell
     self->cur_pos_ = pos;
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::cursor_word_right (class read_line* self)
   {
@@ -584,14 +581,12 @@ namespace ushell
     self->cur_pos_ = pos;
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::delete_one (class read_line* self)
   {
     self->delete_n (1);
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::backspace (class read_line* self)
   {
@@ -603,7 +598,6 @@ namespace ushell
       }
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::backword (class read_line* self)
   {
@@ -612,7 +606,6 @@ namespace ushell
     self->delete_n (end - self->cur_pos_);
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::delete_word (class read_line* self)
   {
@@ -620,7 +613,6 @@ namespace ushell
     self->delete_n (end - self->cur_pos_);
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::delete_to_begin (class read_line* self)
   {
@@ -629,14 +621,12 @@ namespace ushell
     self->delete_n (len);
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::delete_to_end (class read_line* self)
   {
     self->delete_n (self->length_ - self->cur_pos_);
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::history_back (class read_line* self)
   {
@@ -664,7 +654,6 @@ namespace ushell
       }
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::history_forward (class read_line* self)
   {
@@ -682,7 +671,6 @@ namespace ushell
       }
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::history_begin (class read_line* self)
   {
@@ -713,7 +701,6 @@ namespace ushell
     self->set_text (self->current_ + sizeof(hh_t), 1);
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::history_end (class read_line* self)
   {
@@ -721,14 +708,12 @@ namespace ushell
     self->set_text (self->current_ + sizeof(hh_t), 1);
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::enter (class read_line* self)
   {
     self->finish_ = true;
   }
 
-  /* -------------------------------------------------------------------------- */
   void
   read_line::autocomplete (class read_line* self)
   {
