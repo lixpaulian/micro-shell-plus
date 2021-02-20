@@ -31,12 +31,7 @@
 #include <cmsis-plus/diag/trace.h>
 #include <cmsis-plus/posix-io/io.h>
 
-#include "readline.h"
 #include "ushell.h"
-
-#if !defined USE_READLINE
-#define USE_READLINE true
-#endif
 
 #if !defined SHELL_GREET
 #define SHELL_GREET "\nType \"help\" for the list of available commands\n"
@@ -45,11 +40,6 @@
 #if !defined SHELL_PROMPT
 #define SHELL_PROMPT ": "
 #endif
-
-#if !defined SHELL_MAX_LINE_LEN
-#define SHELL_MAX_LINE_LEN 256
-#endif
-
 
 using namespace os;
 
@@ -104,8 +94,7 @@ namespace ushell
             tio.c_cc[VMIN] = 1;
             tio.c_cc[VTIME] = 0;
 
-            read_line rl { tty, nullptr };
-            rl.history_load (nullptr);
+            rl.init (tty, nullptr);
 #else
             tio.c_lflag |= (ICANON | ECHO | ECHOE);
             tio.c_iflag |= (ICRNL | IMAXBEL);
@@ -157,7 +146,7 @@ namespace ushell
                 // restore the original tty settings
                 tty->tcsetattr (TCSANOW, &tio_orig);
 #if USE_READLINE == true
-                rl.history_save ();
+                rl.end ();
 #endif
               }
             tty->close ();
