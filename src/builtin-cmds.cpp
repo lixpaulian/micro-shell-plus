@@ -229,9 +229,10 @@ namespace ushell
 
           case 'h':
             ush->printf (
-                "Usage:\tdate {[-u] | [hh:mm:ss [dd/mm/yy]]}\r\n"
-                "\tdate -c [+/-ppm] to show/set the RTC calibration factor\r\n"
-                "\tdate -t to show the system time zone\r\n");
+                "Usage:\t%s {[-u] | [hh:mm:ss [dd/mm/yy]]}\r\n"
+                "\t%s -c [+/-ppm] to show/set the RTC calibration factor\r\n"
+                "\t%s -t to show the system time zone\r\n",
+                argv[0], argv[0], argv[0]);
             break;
 
           case 'u':
@@ -350,7 +351,7 @@ namespace ushell
     class ushell_cmd** pclasses;
     for (pclasses = ushell::ushell_cmds_; *pclasses != nullptr; pclasses++)
       {
-        ush->printf ("  %-10s%s\n", (*pclasses)->get_cmd_info ()->command,
+        ush->printf ("  %s\t%s\n", (*pclasses)->get_cmd_info ()->command,
                      (*pclasses)->get_cmd_info ()->help_text);
       }
     ush->printf ("For help on a specific command, type \"<cmd> -h\"\n");
