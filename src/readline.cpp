@@ -8,8 +8,10 @@
  * this code. See also <https://github.com/Holixus/readline>.
  *
  * The scope of changes was to create a "readline" intended for small embedded
- * systems, keeping calls to malloc/free to a reasonable minimum with the option
- * to even completely eliminate them.
+ * systems, keeping calls to malloc/free to a reasonable minimum inckuding the
+ * option to completely eliminate them. Depending on the available resources
+ * "readline" can be configured from a minimum functionality to full featured
+ * (history, auto-completion, non-volatile history, etc.).
  *
  * Following changes/additions were made to the original code:
  *
@@ -17,6 +19,8 @@
  * re-entrant and thread safe.
  *
  * - Removed the "windowing" code.
+ *
+ * - Substantially reduced the stack use.
  *
  * More to come, this is still work in progress.
  *
@@ -165,8 +169,8 @@ namespace ushell
             memcpy (p, &hh, sizeof(hh_t));
             memcpy (p + sizeof(hh_t), string, strlen (string));
             p[rec_len - 1] = '\0';      // insert null terminator
-            current_ = history_;        // reset history pointer
           }
+        current_ = history_;            // reset history pointer
       }
   }
 
@@ -228,12 +232,25 @@ namespace ushell
           }
         else
           {
-            ++raw; // skip a char of wrong utf8 sequence
+            ++raw;      // skip a char of wrong utf8 sequence
           }
       }
-    *glyphs = 0;
 
     return glyphs;
+  }
+
+  int
+  read_line::utf8_width (char const* raw)
+  {
+    int count = 0;
+    while (*raw)
+      {
+        if (!utf8_to_glyph (&raw))
+          ++raw;        // skip a char of wrong utf8 sequence
+        ++count;
+      }
+
+    return count;
   }
 
   int
@@ -403,6 +420,7 @@ namespace ushell
     strncpy (raw_, text, std::min (strlen (text) + 1, raw_len_ - 1));
     raw_[raw_len_ - 1] = '\0'; // make sure we have a terminator
     rl_glyph_t* end = utf8tog (line_, raw_);
+    *end = '\0';
     length_ = cur_pos_ = end - line_;
 
     if (redraw)
@@ -418,36 +436,25 @@ namespace ushell
   void
   read_line::insert_seq (char const* seq)
   {
-    rl_glyph_t uc[RL_MAX_LENGTH * 2];
-    rl_glyph_t* end = utf8tog (uc, seq);
-    int count = end - uc;
-    os::trace::printf ("seq %d\n", count);
+    int count = utf8_width (seq);
     int max_count = countof(line_) - length_ - 1;
 
-    if (count > max_count)
+    count = std::min (count, max_count);
+
+    if (count)
       {
-        count = max_count;
+        if (length_ - cur_pos_)
+          {
+            memmove (line_ + cur_pos_ + count, line_ + cur_pos_,
+                     sizeof(rl_glyph_t) * (length_ - cur_pos_));
+          }
+        utf8tog (line_ + cur_pos_, seq);
+        length_ += count;
+        line_[length_] = 0;
+        write_part (cur_pos_, count);
+        cur_pos_ += count;
+        update_tail (0);
       }
-
-    if (!count)
-      {
-        return;
-      }
-
-    if (length_ - cur_pos_)
-      {
-        memmove (line_ + cur_pos_ + count, line_ + cur_pos_,
-                 sizeof(line_[0]) * (length_ - cur_pos_));
-      }
-
-    memcpy (line_ + cur_pos_, uc, sizeof(uc[0]) * count);
-
-    length_ += count;
-    line_[length_] = 0;
-
-    write_part (cur_pos_, count);
-    cur_pos_ += count;
-    update_tail (0);
   }
 
   bool

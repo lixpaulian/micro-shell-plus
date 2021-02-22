@@ -107,6 +107,9 @@ namespace ushell
     utf8tog (rl_glyph_t* glyphs, char const* raw);
 
     int
+    utf8_width (char const* raw);
+
+    int
     one_gtoutf8 (char* raw, rl_glyph_t glyph);
 
     char*
