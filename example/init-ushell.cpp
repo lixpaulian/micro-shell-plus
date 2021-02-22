@@ -49,7 +49,7 @@ static void*
 ush_th (void* args);
 
 // set ushell's thread's stack size
-static constexpr std::size_t th_stack_size = 8092;
+static constexpr std::size_t th_stack_size = 4096;
 
 #if STATIC_USHELL == true
 
