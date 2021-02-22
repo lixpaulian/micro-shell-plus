@@ -41,6 +41,11 @@
 #define SHELL_PROMPT ": "
 #endif
 
+#if !defined SHELL_MAX_CMD_ARGS
+#define SHELL_MAX_CMD_ARGS 10
+#endif
+
+
 using namespace os;
 
 #pragma GCC diagnostic push
@@ -86,14 +91,12 @@ namespace ushell
             memcpy (&tio_orig, &tio, sizeof(struct termios));
 
 #if USE_READLINE == true
-            tio.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON); //~(ICRNL | INPCK | ISTRIP | IXON);
-            tio.c_iflag |=  (IGNBRK);
-            tio.c_oflag |=  (OPOST | ONLCR);
-            tio.c_cflag |=  (CS8);
-            tio.c_lflag &= ~(ECHO | ICANON | IEXTEN); // | ISIG);
+            tio.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+            tio.c_oflag |= (OPOST | ONLCR);
+            tio.c_cflag |= CS8;
+            tio.c_lflag &= ~(ECHO | ICANON | IEXTEN);
             tio.c_cc[VMIN] = 1;
             tio.c_cc[VTIME] = 0;
-
             rl.init (tty, nullptr);
 #else
             tio.c_lflag |= (ICANON | ECHO | ECHOE);
@@ -177,7 +180,7 @@ namespace ushell
   {
     class ushell_cmd** pclasses;
     char* pbuff;
-    char* argv[max_params];
+    char* argv[SHELL_MAX_CMD_ARGS];
     int result = ush_ok;
 
     if (*buff != '\0') // ignore empty strings, at least one character is expected
@@ -201,7 +204,7 @@ namespace ushell
                 int argc;
 
                 // valid command, parse parameters, if any
-                for (argc = 1; argc < max_params; argc++)
+                for (argc = 1; argc < SHELL_MAX_CMD_ARGS; argc++)
                   {
                     if (*pbuff == '\0')
                       {
