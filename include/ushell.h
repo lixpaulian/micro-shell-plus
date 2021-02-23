@@ -121,7 +121,7 @@ namespace ushell
 
     static constexpr uint8_t VERSION_MAJOR = 0;
     static constexpr uint8_t VERSION_MINOR = 1;
-    static constexpr uint8_t VERSION_PATCH = 1;
+    static constexpr uint8_t VERSION_PATCH = 2;
 
     const char* char_device_;
 
