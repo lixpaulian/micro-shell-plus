@@ -41,12 +41,14 @@
 
 // TODO: temporary, replace with "tty.h" after termios support is added to µOS++
 #include "tty-canonical.h"
+#include "ushell-opts.h"
 
 #if defined (__cplusplus)
 
-#define RL_HISTORY_FILE "rl_history"
+#if !defined SHELL_UTF8_SUPPORT
+#define SHELL_UTF8_SUPPORT false
+#endif
 
-#define RL_HISTORY_HEIGHT 32
 #define RL_MAX_LENGTH 256
 
 /* -------------------------------------------------------------------------- */
@@ -151,7 +153,9 @@ namespace ushell
     char* raw_ = nullptr;       // raw buffer, utf-8
     size_t raw_len_ = 0;        // length of the raw buffer
 
+#if SHELL_UTF8_SUPPORT == true
     rl_glyph_t line_[RL_MAX_LENGTH];    // unicode buffer
+#endif
     int length_ = 0, cur_pos_ = 0;      // length and position in glyphs
 
     bool finish_ = false;

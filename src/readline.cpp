@@ -63,6 +63,9 @@
 # define countof(arr)  (sizeof(arr)/sizeof(arr[0]))
 #endif
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 namespace ushell
 {
 
@@ -106,7 +109,9 @@ namespace ushell
     raw_ = (char*) buff;
     raw_len_ = len;
     raw_[0] = '\0';
+#if SHELL_UTF8_SUPPORT == true
     line_[0] = '\0';
+#endif
 
     out (prompt, strlen (prompt));
 
@@ -132,7 +137,9 @@ namespace ushell
 
     cursor_end (this);
     out (nl, strlen (nl));
+#if SHELL_UTF8_SUPPORT == true
     gtoutf8 (raw_, line_, -1);
+#endif
     history_add (raw_);
     return strlen (raw_);
   }
@@ -301,9 +308,14 @@ namespace ushell
   read_line::skip_char_seq (char const* start)
   {
     char const* raw = start;
+
+#if SHELL_UTF8_SUPPORT == true
     rl_glyph_t glyph = utf8_to_glyph (&raw);
 
     if (glyph != '\033')
+#else
+    if (*raw++ != '\033')
+#endif
       {
         return raw - start;
       }
@@ -346,6 +358,7 @@ namespace ushell
       }
     else if (count > 0)
       {
+#if SHELL_UTF8_SUPPORT == true
         char buf[4];
         rl_glyph_t* gl = line_ + cur_pos_;
 
@@ -357,6 +370,10 @@ namespace ushell
                 out (buf, n);
               }
           }
+#else
+        count = std::min (count, (int) strlen (raw_ + cur_pos_));
+        out (raw_ + cur_pos_, count);
+#endif
       }
     return;
   }
@@ -366,6 +383,8 @@ namespace ushell
   {
     int c = afterspace;
     char buf[4];
+
+#if SHELL_UTF8_SUPPORT == true
     rl_glyph_t* gl = line_ + cur_pos_;
 
     while (*gl)
@@ -376,6 +395,10 @@ namespace ushell
             out (buf, n);
           }
       }
+#else
+    out (raw_ + cur_pos_, strlen (raw_ + cur_pos_));
+#endif
+
     buf[0] = ' ';
     while (c--)
       {
@@ -394,6 +417,8 @@ namespace ushell
   void
   read_line::write_part (int start, int length)
   {
+#if SHELL_UTF8_SUPPORT == true
+
     char buf[4];
     rl_glyph_t* gl = line_ + start;
 
@@ -405,6 +430,19 @@ namespace ushell
             out (buf, n);
           }
       }
+#else
+    int count;
+
+    if (length < 0)
+      {
+        count = strlen (raw_ + start);
+      }
+    else
+      {
+        count = std::min (length, (int) strlen (raw_ + start));
+      }
+    out (raw_ + start, count);
+#endif
   }
 
   void
@@ -419,9 +457,13 @@ namespace ushell
 
     strncpy (raw_, text, std::min (strlen (text) + 1, raw_len_ - 1));
     raw_[raw_len_ - 1] = '\0'; // make sure we have a terminator
+#if SHELL_UTF8_SUPPORT == true
     rl_glyph_t* end = utf8tog (line_, raw_);
     *end = '\0';
     length_ = cur_pos_ = end - line_;
+#else
+    length_ = cur_pos_ = strlen (text);
+#endif
 
     if (redraw)
       {
@@ -436,6 +478,7 @@ namespace ushell
   void
   read_line::insert_seq (char const* seq)
   {
+#if SHELL_UTF8_SUPPORT == true
     int count = utf8_width (seq);
     int max_count = countof(line_) - length_ - 1;
 
@@ -451,10 +494,28 @@ namespace ushell
         utf8tog (line_ + cur_pos_, seq);
         length_ += count;
         line_[length_] = 0;
-        write_part (cur_pos_, count);
-        cur_pos_ += count;
-        update_tail (0);
       }
+#else
+    int count = strlen (seq);
+    int max_count = raw_len_ - length_ - 1;
+
+    count = std::min (count, max_count);
+
+    if (count)
+      {
+        if (length_ - cur_pos_)
+          {
+            memmove (raw_ + cur_pos_ + count, raw_ + cur_pos_,
+                     (length_ - cur_pos_));
+          }
+        memcpy (raw_ + cur_pos_, seq, strlen (seq));
+        length_ += count;
+        raw_[length_] = 0;
+      }
+#endif
+    write_part (cur_pos_, count);
+    cur_pos_ += count;
+    update_tail (0);
   }
 
   bool
@@ -486,12 +547,20 @@ namespace ushell
   {
     unsigned int pos = cur_pos_, length = length_;
 
+#if SHELL_UTF8_SUPPORT == true
     while (pos < length && line_[pos] != ' ')
+#else
+    while (pos < length && raw_[pos] != ' ')
+#endif
       {
         ++pos;
       }
 
+#if SHELL_UTF8_SUPPORT == true
     while (pos < length && line_[pos] == ' ')
+#else
+    while (pos < length && raw_[pos] == ' ')
+#endif
       {
         ++pos;
       }
@@ -509,8 +578,13 @@ namespace ushell
           {
             count = tail;
           }
+#if SHELL_UTF8_SUPPORT == true
         memmove (line_ + cur_pos_, line_ + cur_pos_ + count,
                  (length_ - cur_pos_ - count + 1) * sizeof(rl_glyph_t));
+#else
+        memmove (raw_ + cur_pos_, raw_ + cur_pos_ + count,
+                 (length_ - cur_pos_ - count + 1));
+#endif
         length_ -= count;
         update_tail (count);
       }
@@ -560,12 +634,20 @@ namespace ushell
       }
 
     unsigned int pos = self->cur_pos_;
+#if SHELL_UTF8_SUPPORT == true
     while (pos && self->line_[pos - 1] == ' ')
+#else
+    while (pos && self->raw_[pos - 1] == ' ')
+#endif
       {
         --pos;
       }
 
+#if SHELL_UTF8_SUPPORT == true
     while (pos && self->line_[pos - 1] != ' ')
+#else
+    while (pos && self->raw_[pos - 1] != ' ')
+#endif
       {
         --pos;
 
@@ -730,10 +812,13 @@ namespace ushell
       }
 
     char* start = self->raw_;
+#if SHELL_UTF8_SUPPORT == true
     char* cur_pos = self->gtoutf8 (start, self->line_, self->cur_pos_);
     self->gtoutf8 (cur_pos, self->line_ + self->cur_pos_,
                    self->length_ - self->cur_pos_);
-
+#else
+    char* cur_pos = self->raw_ + self->cur_pos_;
+#endif
     char const* insert = (self->get_completion_) (start, cur_pos);
     if (insert)
       {
@@ -742,3 +827,5 @@ namespace ushell
   }
 
 }
+
+#pragma GCC diagnostic pop
