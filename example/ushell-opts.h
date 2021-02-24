@@ -33,5 +33,8 @@
 #ifndef EXAMPLE_USHELL_OPTS_H_
 #define EXAMPLE_USHELL_OPTS_H_
 
+#define SHELL_UTF8_SUPPORT true
+
+#define SHELL_MAX_LINE_LEN 128
 
 #endif /* EXAMPLE_USHELL_OPTS_H_ */
