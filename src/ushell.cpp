@@ -45,7 +45,6 @@
 #define SHELL_MAX_CMD_ARGS 10
 #endif
 
-
 using namespace os;
 
 #pragma GCC diagnostic push
@@ -54,7 +53,7 @@ using namespace os;
 namespace ushell
 {
 
-  class ushell_cmd* ushell::ushell_cmds_[USH_MAX_COMMANDS];
+  class ushell_cmd* ushell::ushell_cmds_[SHELL_MAX_COMMANDS];
 
   ushell::ushell (const char* char_device) :
       char_device_
@@ -77,6 +76,10 @@ namespace ushell
       { SHELL_GREET };
     char prompt[] =
       { SHELL_PROMPT };
+
+#if SHELL_FILE_CMDS == true
+    ph.set_default ("/flash/");
+#endif
 
     tty = static_cast<posix::tty_canonical*> (posix::open (char_device_, 0));
     if (tty != nullptr)
@@ -129,7 +132,7 @@ namespace ushell
                           }
 
                         // clear buffer to end
-                        memset (p, 0, sizeof (buffer) - c);
+                        memset (p, 0, sizeof(buffer) - c);
 
                         // parse and execute command
                         int result = cmd_parser (buffer);
@@ -258,7 +261,7 @@ namespace ushell
     bool result = false;
     int i;
 
-    for (i = 0; i < USH_MAX_COMMANDS; i++)
+    for (i = 0; i < SHELL_MAX_COMMANDS; i++)
       {
         if (ushell_cmds_[i] == nullptr)
           {
@@ -269,7 +272,7 @@ namespace ushell
       }
 
     // check if the table overflowed
-    assert(i < USH_MAX_COMMANDS);
+    assert(i < SHELL_MAX_COMMANDS);
 
     return result;
   }
