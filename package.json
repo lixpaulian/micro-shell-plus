@@ -1,6 +1,6 @@
 {
 	"name": "@lix/micro-shell-plus",
-	"version": "0.1.3",
+	"version": "0.2.1",
 	"description": "A micro shell for embedded systems written in C++",
 	"author": {
 		"name": "Lix N. Paulian",
