@@ -90,7 +90,7 @@ namespace ushell
             // configure the tty in canonical mode
             memcpy (&tio_orig, &tio, sizeof(struct termios));
 
-#if USE_READLINE == true
+#if SHELL_USE_READLINE == true
             tio.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
             tio.c_oflag |= (OPOST | ONLCR);
             tio.c_cflag |= CS8;
@@ -112,7 +112,7 @@ namespace ushell
 
                 do
                   {
-#if USE_READLINE == true
+#if SHELL_USE_READLINE == true
                     if ((c = rl.readline (prompt, buffer, sizeof(buffer))) > 0)
 #else
                     tty->write (prompt, strlen (prompt));
@@ -148,7 +148,7 @@ namespace ushell
 
                 // restore the original tty settings
                 tty->tcsetattr (TCSANOW, &tio_orig);
-#if USE_READLINE == true
+#if SHELL_USE_READLINE == true
                 rl.end ();
 #endif
               }
