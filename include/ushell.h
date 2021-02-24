@@ -31,19 +31,18 @@
 #define INCLUDE_USHELL_H_
 
 #include <tty-canonical.h> // this is temporary, should be <tty.h>
-
-#include "ushell-opts.h"
 #include "readline.h"
+#include "ushell-opts.h"
 
 
 #if defined (__cplusplus)
 
-#if !defined USE_READLINE
-#define USE_READLINE true
-#endif
-
 #if !defined SHELL_MAX_LINE_LEN
 #define SHELL_MAX_LINE_LEN 256
+#endif
+
+#if !defined SHELL_USE_READLINE
+#define SHELL_USE_READLINE true
 #endif
 
 #if !defined USH_MAX_COMMANDS
@@ -115,13 +114,13 @@ namespace ushell
     int
     cmd_parser (char* buff);
 
-#if USE_READLINE == true
+#if SHELL_USE_READLINE == true
     read_line rl { nullptr };
 #endif
 
     static constexpr uint8_t VERSION_MAJOR = 0;
     static constexpr uint8_t VERSION_MINOR = 1;
-    static constexpr uint8_t VERSION_PATCH = 2;
+    static constexpr uint8_t VERSION_PATCH = 3;
 
     const char* char_device_;
 
