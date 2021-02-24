@@ -39,7 +39,7 @@
 
 #include "init-ushell.h"
 
-#define STATIC_USHELL false
+#define STATIC_USHELL true
 
 using namespace os;
 using namespace os::rtos;
