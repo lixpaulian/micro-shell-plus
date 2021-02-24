@@ -361,49 +361,49 @@ namespace ushell
 
   //----------------------------------------------------------------------------
 
-#if !defined USH_VERSION_CMD
-#define USH_VERSION_CMD true
+#if !defined SHELL_VERSION_CMD
+#define SHELL_VERSION_CMD true
 #endif
 
-#if !defined USH_PS_CMD
-#define USH_PS_CMD true
+#if !defined SHELL_PS_CMD
+#define SHELL_PS_CMD true
 #endif
 
-#if !defined USH_DATE_CMD
-#define USH_DATE_CMD true
+#if !defined SHELL_DATE_CMD
+#define SHELL_DATE_CMD true
 #endif
 
-#if !defined USH_QUIT_CMD
-#define USH_QUIT_CMD true
+#if !defined SHELL_QUIT_CMD
+#define SHELL_QUIT_CMD true
 #endif
 
-#if !defined USH_HELP_CMD
-#define USH_HELP_CMD true
+#if !defined SHELL_HELP_CMD
+#define SHELL_HELP_CMD true
 #endif
 
   // instantiate command classes
 
-#if USH_VERSION_CMD == true
+#if SHELL_VERSION_CMD == true
   ush_version version
     { };
 #endif
 
-#if USH_PS_CMD == true
+#if SHELL_PS_CMD == true
   ush_ps ps
     { };
 #endif
 
-#if USH_DATE_CMD == true
+#if SHELL_DATE_CMD == true
   ush_date date
     { };
 #endif
 
-#if USH_QUIT_CMD == true
+#if SHELL_QUIT_CMD == true
   ush_quit quit
     { };
 #endif
 
-#if USH_HELP_CMD == true
+#if SHELL_HELP_CMD == true
   ush_help help
     { };
 #endif
