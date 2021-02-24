@@ -46,12 +46,12 @@
 #if defined (__cplusplus)
 
 #if !defined SHELL_UTF8_SUPPORT
-#define SHELL_UTF8_SUPPORT false
+#define SHELL_UTF8_SUPPORT true
 #endif
 
-#define RL_MAX_LENGTH 256
-
-/* -------------------------------------------------------------------------- */
+#if !defined SHELL_MAX_LINE_LEN
+#define SHELL_MAX_LINE_LEN 256
+#endif
 
 namespace ushell
 {
@@ -150,14 +150,14 @@ namespace ushell
     char history_[1024];
     char* current_ = history_;
 
-    char* raw_ = nullptr;       // raw buffer, utf-8
-    size_t raw_len_ = 0;        // length of the raw buffer
+    char* raw_ = nullptr; // raw buffer, utf-8
+    size_t raw_len_ = 0;  // length of the raw buffer
 
 #if SHELL_UTF8_SUPPORT == true
-    rl_glyph_t line_[RL_MAX_LENGTH];    // unicode buffer
+    rl_glyph_t line_[SHELL_MAX_LINE_LEN]; // unicode buffer
 #endif
-    int length_ = 0, cur_pos_ = 0;      // length and position in glyphs
-
+    int length_ = 0;    // length in glyphs
+    int cur_pos_ = 0;   // position in glyphs
     bool finish_ = false;
 
     os::posix::tty_canonical* tty_ = nullptr;
