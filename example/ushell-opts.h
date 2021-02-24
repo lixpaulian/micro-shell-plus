@@ -37,4 +37,6 @@
 
 #define SHELL_MAX_LINE_LEN 128
 
+#define SHELL_FILE_CMDS true
+
 #endif /* EXAMPLE_USHELL_OPTS_H_ */
