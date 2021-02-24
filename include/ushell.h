@@ -34,7 +34,6 @@
 #include "readline.h"
 #include "ushell-opts.h"
 
-
 #if defined (__cplusplus)
 
 #if !defined SHELL_MAX_LINE_LEN
@@ -45,8 +44,16 @@
 #define SHELL_USE_READLINE true
 #endif
 
-#if !defined USH_MAX_COMMANDS
-#define USH_MAX_COMMANDS 40
+#if !defined SHELL_MAX_COMMANDS
+#define SHELL_MAX_COMMANDS 40
+#endif
+
+#if !defined SHELL_FILE_CMDS
+#define SHELL_FILE_CMDS true
+#endif
+
+#if SHELL_FILE_CMDS == true
+#include "path.h"
 #endif
 
 namespace ushell
@@ -99,7 +106,12 @@ namespace ushell
     int
     printf (const char* format, ...);
 
-    static ushell_cmd* ushell_cmds_[USH_MAX_COMMANDS];
+    static ushell_cmd* ushell_cmds_[SHELL_MAX_COMMANDS];
+
+#if SHELL_FILE_CMDS == true
+    path ph
+      { };
+#endif
 
     //--------------------------------------------------------------------------
 
@@ -115,12 +127,13 @@ namespace ushell
     cmd_parser (char* buff);
 
 #if SHELL_USE_READLINE == true
-    read_line rl { nullptr };
+    read_line rl
+      { nullptr };
 #endif
 
     static constexpr uint8_t VERSION_MAJOR = 0;
-    static constexpr uint8_t VERSION_MINOR = 1;
-    static constexpr uint8_t VERSION_PATCH = 3;
+    static constexpr uint8_t VERSION_MINOR = 2;
+    static constexpr uint8_t VERSION_PATCH = 1;
 
     const char* char_device_;
 
