@@ -22,6 +22,9 @@
  *
  * - Substantially reduced the stack use.
  *
+ * - Made UTF-8 support optional, by disabling it RAM and flash resources are
+ * further reduced.
+ *
  * More to come, this is still work in progress.
  *
  * 12 February 2021
