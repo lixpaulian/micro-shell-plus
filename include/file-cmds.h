@@ -86,6 +86,86 @@ namespace ushell
 
   };
 
+  class ush_cp : public ushell_cmd
+  {
+  public:
+
+    ush_cp (void);
+
+    virtual
+    ~ush_cp () noexcept;
+
+    virtual int
+    do_cmd (class ushell* ush, int argc, char* argv[]);
+
+  private:
+
+    int
+    copy_file (char* src_path, char* dst_path);
+
+  };
+
+  class ush_pwd : public ushell_cmd
+  {
+  public:
+
+    ush_pwd (void);
+
+    virtual
+    ~ush_pwd () noexcept;
+
+    virtual int
+    do_cmd (class ushell* ush, int argc, char* argv[]);
+
+  };
+
+  class ush_rm : public ushell_cmd
+  {
+  public:
+
+    ush_rm (void);
+
+    virtual
+    ~ush_rm () noexcept;
+
+    virtual int
+    do_cmd (class ushell* ush, int argc, char* argv[]);
+
+  private:
+
+    int
+    empty_dir (char* path, size_t len);
+
+  };
+
+  class ush_cat : public ushell_cmd
+  {
+  public:
+
+    ush_cat (void);
+
+    virtual
+    ~ush_cat () noexcept;
+
+    virtual int
+    do_cmd (class ushell* ush, int argc, char* argv[]);
+
+  };
+
+  class ush_fdisk : public ushell_cmd
+  {
+  public:
+
+    ush_fdisk (void);
+
+    virtual
+    ~ush_fdisk () noexcept;
+
+    virtual int
+    do_cmd (class ushell* ush, int argc, char* argv[]);
+
+  };
+
 }
 
 #endif /* __cplusplus */

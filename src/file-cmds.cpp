@@ -31,6 +31,8 @@
 #include <cmsis-plus/diag/trace.h>
 #include <cmsis-plus/posix-io/file-system.h>
 
+#include <fcntl.h>
+
 #include "file-cmds.h"
 #include "optparse.h"
 #include "path.h"
@@ -44,6 +46,7 @@ namespace ushell
 #if SHELL_FILE_CMDS == true
 
 #define CWD_BUF_LEN 260
+#define FILE_BUFFER 4096
 
   /**
    * @brief Constructor for the "list files" class.
@@ -238,7 +241,7 @@ namespace ushell
         switch (ch)
           {
           case 'h':
-            ush->printf ("Usage: mkdir <path-to-dir>\n");
+            ush->printf ("Usage: %s <path-to-dir>\n", argv[0]);
             break;
 
           case '?':
@@ -252,17 +255,16 @@ namespace ushell
       {
         // handle the case with no options
         argc -= getopt.optind;
-        argv += getopt.optind;
 
         if (getopt.optind == 1 && argc == 0)
           {
             // no arguments at all, show usage
-            ush->printf ("Usage: mkdir <path-to-dir>\n");
+            ush->printf ("Usage: %s <path-to-dir>\n", argv[0]);
           }
         else if (argc)
           {
             // handle positional arguments: get the directory name
-            ush->ph.to_absolute (argv[0], path, CWD_BUF_LEN);
+            ush->ph.to_absolute (argv[1], path, CWD_BUF_LEN);
             if ((posix::mkdir (path, 0)) < 0)
               {
                 ush->printf ("Failed to create the %s directory\n", path);
@@ -314,7 +316,7 @@ namespace ushell
         switch (ch)
           {
           case 'h':
-            ush->printf ("Usage: cd [path]\n");
+            ush->printf ("Usage: %s [path]\n", argv[0]);
             break;
 
           case '?':
@@ -353,6 +355,469 @@ namespace ushell
     return result;
   }
 
+  /**
+   * @brief Constructor for the "copy" class.
+   */
+  ush_cp::ush_cp (void)
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+    info_.command = "cp";
+    info_.help_text = "Copy file(s)";
+  }
+
+  /**
+   * Destructor.
+   */
+  ush_cp::~ush_cp ()
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+  }
+
+  /**
+   * @brief Implementation of the "copy file(s)" command.
+   * @param ush: pointer to the ushell class.
+   * @param argc: arguments count.
+   * @param argv: arguments.
+   * @return Result of the command's execution.
+   */
+  int
+  ush_cp::do_cmd (class ushell* ush, int argc, char* argv[])
+  {
+    char src[CWD_BUF_LEN + 1] =
+      { '\0' };
+    char dst[CWD_BUF_LEN + 1] =
+      { '\0' };
+    int result = ush_ok;
+
+    opt_parse getopt
+      { argc, argv };
+    int ch;
+
+    while ((ch = getopt.optparse ("h")) != -1)
+      {
+        switch (ch)
+          {
+          case 'h':
+            ush->printf ("Usage:\t%s <source_file> <target_file>\n", argv[0]);
+            break;
+
+          case '?':
+            ush->printf ("%s\n", getopt.errmsg);
+            result = ush_option_invalid;
+            break;
+          }
+      }
+
+    if (result == ush_ok)
+      {
+        // handle the case with no options
+        char* p = argv[0];
+        argc -= getopt.optind;
+        argv += getopt.optind;
+
+        if (getopt.optind == 1 && argc == 0)
+          {
+            // not enough arguments, print help again
+            ush->printf ("Usage:\t%s <source_file> <target_file>\n", p);
+          }
+        else if (argc)
+          {
+            if (argc != 2)
+              {
+                result = ush_param_invalid;
+              }
+            else
+              {
+                // get absolute paths
+                ush->ph.to_absolute (argv[0], src, CWD_BUF_LEN);
+                ush->ph.to_absolute (argv[1], dst, CWD_BUF_LEN);
+                if (ush->ph.is_dir (dst) == 1)
+                  {
+                    const char* p = ush->ph.file_from_path (src);
+                    if ((strlen (dst) + strlen (p) + 1) < CWD_BUF_LEN)
+                      {
+                        strcat (dst, "/");
+                        strcat (dst, p);
+                      }
+                  }
+
+                // copy file
+                if ((copy_file (src, dst)) != 0)
+                  {
+                    ush->printf ("File copy failed\n");
+                  }
+              }
+          }
+      }
+
+    return result;
+  }
+
+  /**
+   * @brief: Helper function for copy command.
+   * @param src_path: pointer to the ushell class.
+   * @param dst_path: arguments count.
+   * @return 0 if succeeds, negative/positive number otherwise.
+   */
+  int
+  ush_cp::copy_file (char* src_path, char* dst_path)
+  {
+    static constexpr size_t file_copy_block = 4096;
+
+    int res = -1;
+    posix::io* fsrc, * fdst;    // file pointers
+    uint8_t* buffer;            // file copy buffer
+
+    if ((buffer = new uint8_t[file_copy_block]))
+      {
+        // open source file
+        fsrc = posix::open (src_path, O_RDONLY);
+        if (fsrc)
+          {
+            // open destination file
+            fdst = posix::open (dst_path, O_WRONLY | O_CREAT);
+            if (fdst)
+              {
+                // copy source to destination
+                for (;;)
+                  {
+                    // read a chunk of source file
+                    int count = fsrc->read (buffer, file_copy_block);
+                    if (count <= 0)
+                      {
+                        res = count;
+                        break;    // EOF or error
+                      }
+                    // write it to the destination file
+                    res = fdst->write (buffer, count);
+                    if (res != count)
+                      {
+                        break; // error or disk full
+                      }
+                  }
+                fdst->close ();
+              }
+            // close open files
+            fsrc->close ();
+          }
+        delete (buffer);
+      }
+
+    return res;
+  }
+
+  /**
+   * @brief Constructor for the "pwd" class.
+   */
+  ush_pwd::ush_pwd (void)
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+    info_.command = "pwd";
+    info_.help_text = "Print working directory path";
+  }
+
+  /**
+   * Destructor.
+   */
+  ush_pwd::~ush_pwd ()
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+  }
+
+  /**
+   * @brief Implementation of the "pwd" command.
+   * @param ush: pointer to the ushell class.
+   * @param argc: arguments count.
+   * @param argv: arguments.
+   * @return Result of the command's execution.
+   */
+  int
+  ush_pwd::do_cmd (class ushell* ush, int argc, char* argv[])
+  {
+    int result = ush_ok;
+
+    opt_parse getopt
+      { argc, argv };
+    int ch;
+
+    while ((ch = getopt.optparse ("h")) != -1)
+      {
+        switch (ch)
+          {
+          case 'h':
+            ush->printf ("Usage: pwd\n", argv[0]);
+            break;
+
+          case '?':
+            ush->printf ("%s\n", getopt.errmsg);
+            result = ush_option_invalid;
+            break;
+          }
+      }
+
+    if (result == ush_ok)
+      {
+        argc -= getopt.optind;
+        argv += getopt.optind;
+
+        if (getopt.optind == 1 && argc == 0)
+          {
+            ush->printf ("%s\n", ush->ph.get ());
+          }
+        else if (argc)
+          {
+            result = ush_param_invalid;
+          }
+      }
+
+    return result;
+  }
+
+  /**
+   * @brief Constructor for the "rm" class.
+   */
+  ush_rm::ush_rm (void)
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+    info_.command = "rm";
+    info_.help_text = "Remove directory entries";
+  }
+
+  /**
+   * Destructor.
+   */
+  ush_rm::~ush_rm ()
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+  }
+
+  /**
+   * @brief Implementation of the "rm" command.
+   * @param ush: pointer to the ushell class.
+   * @param argc: arguments count.
+   * @param argv: arguments.
+   * @return Result of the command's execution.
+   */
+  int
+  ush_rm::do_cmd (class ushell* ush, int argc, char* argv[])
+  {
+    char path[CWD_BUF_LEN + 1] =
+      { '\0' };
+    int res = -1;
+    int result = ush_ok;
+
+    opt_parse getopt
+      { argc, argv };
+    int ch;
+
+    while ((ch = getopt.optparse ("h")) != -1)
+      {
+        switch (ch)
+          {
+          case 'h':
+            ush->printf ("Usage: %s <path>\n", argv[0]);
+            break;
+
+          case '?':
+            ush->printf ("%s\n", getopt.errmsg);
+            result = ush_option_invalid;
+            break;
+          }
+      }
+
+    if (result == ush_ok)
+      {
+        argc -= getopt.optind;
+        argv += getopt.optind;
+
+        if (getopt.optind == 1 && argc == 0)
+          {
+            result = ush_param_invalid;
+          }
+        else if (argc)
+          {
+            // get absolute path
+            ush->ph.to_absolute (argv[0], path, CWD_BUF_LEN);
+
+            struct stat st_buf;
+            if (posix::stat (path, &st_buf) == 0)
+              {
+                if (st_buf.st_mode & S_IFDIR)
+                  {
+                    // directory
+                    res = empty_dir (path, CWD_BUF_LEN);
+                    if (res == 0)
+                      {
+                        res = posix::rmdir (path);
+                      }
+                  }
+                else
+                  {
+                    // single file
+                    res = posix::unlink (path);
+                  }
+              }
+            if (res < 0)
+              {
+                ush->printf ("Could not delete file(s)\n");
+              }
+          }
+      }
+
+    return result;
+  }
+
+  /**
+   * @brief Helper function. It deletes recursively all the files in a directory.
+   * @param path: pointer to a buffer containing the directory's path.
+   * @param len: length of the buffer.
+   * @return 0 if successful, non-zero if it fails.
+   */
+  int
+  ush_rm::empty_dir (char* path, size_t len)
+  {
+    int res = -1;
+    posix::directory* fr;
+    struct dirent* dp;
+    struct stat st_buf;
+
+    if ((fr = posix::opendir (path)))
+      {
+        // pointer on end of path; if path ends with no "/", then add one
+        char* pp = path + strlen (path);
+        if (*(pp - 1) != '/')
+          {
+            strcat (path, "/");
+            pp++;
+          }
+
+        for (;;)
+          {
+            dp = fr->read ();
+            if (dp == nullptr)
+              {
+                *--pp = '\0';
+                break;
+              }
+
+            strncat (path, dp->d_name, len - strlen (path));
+            posix::stat (path, &st_buf);
+            if (st_buf.st_mode & S_IFDIR)
+              {
+                res = empty_dir (path, len);
+                if (res == 0)
+                  {
+                    res = posix::rmdir (path);
+                  }
+              }
+            else
+              {
+                res = posix::unlink (path);
+              }
+            if (res < 0)
+              {
+                break;
+              }
+            *pp = '\0';
+          }
+
+        res = fr->close ();
+      }
+
+    return res;
+  }
+
+  /**
+   * @brief Constructor for the "cat" class.
+   */
+  ush_cat::ush_cat (void)
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+    info_.command = "cat";
+    info_.help_text = "Dump a file to the console";
+  }
+
+  /**
+   * Destructor.
+   */
+  ush_cat::~ush_cat ()
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+  }
+
+  /**
+   * @brief
+   * @param ush
+   * @param argc
+   * @param argv
+   * @return
+   */
+  int
+  ush_cat::do_cmd (class ushell* ush, int argc, char* argv[])
+  {
+    char path[CWD_BUF_LEN + 1] =
+      { '\0' };
+    int result = ush_ok;
+
+    opt_parse getopt
+      { argc, argv };
+    int ch;
+
+    while ((ch = getopt.optparse ("h")) != -1)
+      {
+        switch (ch)
+          {
+          case 'h':
+            ush->printf ("Usage: %s <path>\n", argv[0]);
+            break;
+
+          case '?':
+            ush->printf ("%s\n", getopt.errmsg);
+            result = ush_option_invalid;
+            break;
+          }
+      }
+
+    if (result == ush_ok)
+      {
+        argc -= getopt.optind;
+        argv += getopt.optind;
+
+        if (getopt.optind == 1 && argc == 0)
+          {
+            result = ush_param_invalid;
+          }
+        else if (argc)
+          {
+            // convert to absolute path
+            ush->ph.to_absolute (argv[0], path, CWD_BUF_LEN);
+
+            posix::io* f;
+            if ((f = posix::open (path, O_RDONLY)) == nullptr)
+              {
+                ush->printf ("File not found\n");
+              }
+            else
+              {
+                char* buff;
+                if ((buff = new char[FILE_BUFFER]))
+                  {
+                    size_t count;
+                    while ((count = f->read (buff, FILE_BUFFER)) > 0)
+                      {
+                        ush->printf ("%.*s", count, buff);
+                      }
+                    ush->printf ("\n");
+                    delete (buff);
+                  }
+                f->close ();
+              }
+          }
+      }
+
+    return result;
+  }
+
   //----------------------------------------------------------------------------
 
   // instantiate command classes
@@ -364,6 +829,18 @@ namespace ushell
     { };
 
   ush_cd cd
+    { };
+
+  ush_cp cp
+    { };
+
+  ush_pwd pwd
+    { };
+
+  ush_rm rm
+    { };
+
+  ush_cat cat
     { };
 
 #endif
