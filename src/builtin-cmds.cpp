@@ -112,7 +112,7 @@ namespace ushell
   int
   ush_ps::do_cmd (class ushell* ush, int argc, char* argv[])
   {
-    ush->printf ("%-10.20s\t%s\r\n%-10.20s\t%s\r\n", "Thread Name",
+    ush->printf ("%-10.20s\t%s\n%-10.20s\t%s\n", "Thread Name",
                  "\tState\tPrio\t%CPU\tStack", "===========",
                  "\t=====\t====\t====\t=====");
     iterate_threads (ush, nullptr, 0);
@@ -149,7 +149,7 @@ namespace ushell
             * 100 / scheduler::statistics::cpu_cycles ();
 
         ush->printf (
-            "%-20s\t%s\t%3u\t%s%2u%%\t%5u\r\n", p.name (), thread_state[st],
+            "%-20s\t%s\t%3u\t%s%2u%%\t%5u\n", p.name (), thread_state[st],
             p.priority (), thread_cpu_cycles > 0 ? " " : "<",
             (unsigned int) (thread_cpu_cycles > 0 ? thread_cpu_cycles : 1),
             stk.size () - used);
@@ -205,7 +205,7 @@ namespace ushell
           case 'c':
             if (getopt.optarg == nullptr)
               {
-                ush->printf ("Calibration register %d\r\n",
+                ush->printf ("Calibration register %d\n",
                              my_rtc.get_cal_factor ());
               }
             else
@@ -224,20 +224,20 @@ namespace ushell
             break;
 
           case 't':
-            ush->printf ("%s\r\n", getenv ("TZ"));
+            ush->printf ("%s\n", getenv ("TZ"));
             break;
 
           case 'h':
             ush->printf (
-                "Usage:\t%s {[-u] | [hh:mm:ss [dd/mm/yy]]}\r\n"
-                "\t%s -c [+/-ppm] to show/set the RTC calibration factor\r\n"
-                "\t%s -t to show the system time zone\r\n",
+                "Usage:\t%s {[-u] | [hh:mm:ss [dd/mm/yy]]}\n"
+                "\t%s -c [+/-ppm] to show/set the RTC calibration factor\n"
+                "\t%s -t to show the system time zone\n",
                 argv[0], argv[0], argv[0]);
             break;
 
           case 'u':
             tdata = gmtime (&u_time);
-            ush->printf ("UTC time:\t%s\r", asctime (tdata));
+            ush->printf ("UTC time:\t%s", asctime (tdata));
             break;
 
           case '?':
@@ -256,7 +256,7 @@ namespace ushell
         if (getopt.optind == 1 && argc == 0)
           {
             // no arguments at all, show date/time
-            ush->printf ("Local time:\t%s\r", asctime (tdata));
+            ush->printf ("Local time:\t%s", asctime (tdata));
           }
         else if (argc)
           {
@@ -351,7 +351,7 @@ namespace ushell
     class ushell_cmd** pclasses;
     for (pclasses = ushell::ushell_cmds_; *pclasses != nullptr; pclasses++)
       {
-        ush->printf ("  %s\t%s\n", (*pclasses)->get_cmd_info ()->command,
+        ush->printf (" %s\t%s\n", (*pclasses)->get_cmd_info ()->command,
                      (*pclasses)->get_cmd_info ()->help_text);
       }
     ush->printf ("For help on a specific command, type \"<cmd> -h\"\n");
