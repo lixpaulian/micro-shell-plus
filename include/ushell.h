@@ -106,6 +106,9 @@ namespace ushell
     int
     printf (const char* format, ...);
 
+    int
+    getchar (void);
+
     static ushell_cmd* ushell_cmds_[SHELL_MAX_COMMANDS];
 
 #if SHELL_FILE_CMDS == true
@@ -133,7 +136,7 @@ namespace ushell
 
     static constexpr uint8_t VERSION_MAJOR = 0;
     static constexpr uint8_t VERSION_MINOR = 2;
-    static constexpr uint8_t VERSION_PATCH = 2;
+    static constexpr uint8_t VERSION_PATCH = 3;
 
     const char* char_device_;
 

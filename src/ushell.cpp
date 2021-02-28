@@ -162,8 +162,6 @@ namespace ushell
     return nullptr;
   }
 
-  //----------------------------------------------------------------------------
-
   int
   ushell::printf (const char* fmt, ...)
   {
@@ -174,6 +172,19 @@ namespace ushell
     va_end(ap);
 
     return result;
+  }
+
+  int
+  ushell::getchar (void)
+  {
+    int c = 0, r;
+
+    if ((r = tty->read (&c, 1)) < 0)
+      {
+        c = r;
+      }
+
+    return c;
   }
 
   //----------------------------------------------------------------------------
