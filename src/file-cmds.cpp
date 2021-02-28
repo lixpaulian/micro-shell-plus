@@ -30,6 +30,8 @@
 #include <cmsis-plus/rtos/os.h>
 #include <cmsis-plus/diag/trace.h>
 #include <cmsis-plus/posix-io/file-system.h>
+#include <cmsis-plus/posix-io/block-device-partition.h>
+#include <cmsis-plus/posix-io/chan-fatfs-file-system.h>
 
 #include <fcntl.h>
 
@@ -39,6 +41,8 @@
 
 using namespace os;
 using namespace os::rtos;
+
+extern posix::chan_fatfs_file_system_lockable<rtos::mutex> fat_fs;
 
 namespace ushell
 {
@@ -91,7 +95,7 @@ namespace ushell
         switch (ch)
           {
           case 'h':
-            ush->printf ("Usage: %s [path]\n", argv[0]);
+            ush->printf ("Usage:\t%s [path]\n", argv[0]);
             break;
 
           case '?':
@@ -200,6 +204,8 @@ namespace ushell
     return result;
   }
 
+  //----------------------------------------------------------------------------
+
   /**
    * @brief Constructor for the "make directory" class.
    */
@@ -241,7 +247,7 @@ namespace ushell
         switch (ch)
           {
           case 'h':
-            ush->printf ("Usage: %s <path-to-dir>\n", argv[0]);
+            ush->printf ("Usage:\t%s <path-to-dir>\n", argv[0]);
             break;
 
           case '?':
@@ -259,7 +265,7 @@ namespace ushell
         if (getopt.optind == 1 && argc == 0)
           {
             // no arguments at all, show usage
-            ush->printf ("Usage: %s <path-to-dir>\n", argv[0]);
+            ush->printf ("Usage:\t%s <path-to-dir>\n", argv[0]);
           }
         else if (argc)
           {
@@ -274,6 +280,8 @@ namespace ushell
 
     return result;
   }
+
+  //----------------------------------------------------------------------------
 
   /**
    * @brief Constructor for the "change directory" class.
@@ -316,7 +324,7 @@ namespace ushell
         switch (ch)
           {
           case 'h':
-            ush->printf ("Usage: %s [path]\n", argv[0]);
+            ush->printf ("Usage:\t%s [path]\n", argv[0]);
             break;
 
           case '?':
@@ -355,6 +363,8 @@ namespace ushell
     return result;
   }
 
+  //----------------------------------------------------------------------------
+
   /**
    * @brief Constructor for the "copy" class.
    */
@@ -362,7 +372,7 @@ namespace ushell
   {
     trace::printf ("%s() %p\n", __func__, this);
     info_.command = "cp";
-    info_.help_text = "Copy file(s)";
+    info_.help_text = "Copy file";
   }
 
   /**
@@ -455,8 +465,8 @@ namespace ushell
 
   /**
    * @brief: Helper function for copy command.
-   * @param src_path: pointer to the ushell class.
-   * @param dst_path: arguments count.
+   * @param src_path: source file.
+   * @param dst_path: destination.
    * @return 0 if succeeds, negative/positive number otherwise.
    */
   int
@@ -506,6 +516,8 @@ namespace ushell
     return res;
   }
 
+  //----------------------------------------------------------------------------
+
   /**
    * @brief Constructor for the "pwd" class.
    */
@@ -545,7 +557,7 @@ namespace ushell
         switch (ch)
           {
           case 'h':
-            ush->printf ("Usage: pwd\n", argv[0]);
+            ush->printf ("Usage:\t%s\n", argv[0]);
             break;
 
           case '?':
@@ -572,6 +584,8 @@ namespace ushell
 
     return result;
   }
+
+  //----------------------------------------------------------------------------
 
   /**
    * @brief Constructor for the "rm" class.
@@ -615,7 +629,7 @@ namespace ushell
         switch (ch)
           {
           case 'h':
-            ush->printf ("Usage: %s <path>\n", argv[0]);
+            ush->printf ("Usage:\t%s <path>\n", argv[0]);
             break;
 
           case '?':
@@ -727,6 +741,8 @@ namespace ushell
     return res;
   }
 
+  //----------------------------------------------------------------------------
+
   /**
    * @brief Constructor for the "cat" class.
    */
@@ -746,11 +762,11 @@ namespace ushell
   }
 
   /**
-   * @brief
-   * @param ush
-   * @param argc
-   * @param argv
-   * @return
+   * @brief Implementation of the "cat" command.
+   * @param ush: pointer to the ushell class.
+   * @param argc: arguments count.
+   * @param argv: arguments.
+   * @return Result of the command's execution.
    */
   int
   ush_cat::do_cmd (class ushell* ush, int argc, char* argv[])
@@ -768,7 +784,7 @@ namespace ushell
         switch (ch)
           {
           case 'h':
-            ush->printf ("Usage: %s <path>\n", argv[0]);
+            ush->printf ("Usage:\t%s <path>\n", argv[0]);
             break;
 
           case '?':
@@ -820,6 +836,136 @@ namespace ushell
 
   //----------------------------------------------------------------------------
 
+  /**
+   * @brief Constructor for the "fdisk" class.
+   */
+  ush_fdisk::ush_fdisk (void)
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+    info_.command = "fdisk";
+    info_.help_text = "Format disk";
+  }
+
+  /**
+   * Destructor.
+   */
+  ush_fdisk::~ush_fdisk ()
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+  }
+
+  /**
+   * @brief Implementation of the "cat" command.
+   * @param ush: pointer to the ushell class.
+   * @param argc: arguments count.
+   * @param argv: arguments.
+   * @return Result of the command's execution.
+   */
+  int
+  ush_fdisk::do_cmd (class ushell* ush, int argc, char* argv[])
+  {
+    int result = ush_ok;
+    bool format = false, done = false;
+
+    opt_parse getopt
+      { argc, argv };
+    int ch;
+
+    while ((ch = getopt.optparse ("hy")) != -1)
+      {
+        switch (ch)
+          {
+          case 'h':
+            ush->printf ("Usage:\t%s <path> (currently only \"flash\")\n"
+                         "\tuse -y to skip the confirmation prompt\n",
+                         argv[0]);
+            done = true;
+            break;
+
+          case 'y':
+            format = true;
+            break;
+
+          case '?':
+            ush->printf ("%s\n", getopt.errmsg);
+            result = ush_option_invalid;
+            break;
+          }
+      }
+
+    if (result == ush_ok && !done)
+      {
+        argc -= getopt.optind;
+        argv += getopt.optind;
+
+        if (argc == 0)
+          {
+            result = ush_param_invalid;
+          }
+        else if (argc)
+          {
+            if (format == false)
+              {
+                ush->printf ("The data on the disk %s will be lost; "
+                             "are you sure you want to proceed? (y/n): ",
+                             argv[0]);
+
+                int c = ush->getchar ();
+                ush->printf ("%c\n", c);
+
+                if (toupper (c) == 'Y')
+                  {
+                    format = true;
+                  }
+              }
+            if (format)
+              {
+                int res = 0;
+                if (!strcasecmp (argv[0], "flash"))
+                  {
+                    fat_fs.umount ();
+
+                    fat_fs.device ().open ();
+                    size_t bs = fat_fs.device ().block_logical_size_bytes ();
+                    uint8_t* buff = new uint8_t[bs];
+                    res = fat_fs.mkfs (FM_FAT | FM_SFD, 0, 0, buff, bs);
+                    fat_fs.device ().close ();
+                    delete buff;
+
+                    if (res >= 0)
+                      {
+                        if (fat_fs.mount ("/flash/") < 0)
+                          {
+                            ush->printf ("Failed to mount /%s\n", argv[0]);
+                          }
+                        else
+                          {
+                            ush->printf ("Disk /%s erased\n", argv[0]);
+                          }
+                      }
+                    else
+                      {
+                        ush->printf ("Failed to format the /%s disk\n",
+                                     argv[0]);
+                      }
+                  }
+//                else if ()
+//                  {
+//                    //...    for other file systems
+//                  }
+                else
+                  {
+                    result = ush_param_invalid;
+                  }
+              }
+          }
+      }
+
+    return result;
+  }
+
+  //----------------------------------------------------------------------------
+
   // instantiate command classes
 
   ush_ls ls
@@ -841,6 +987,9 @@ namespace ushell
     { };
 
   ush_cat cat
+    { };
+
+  ush_fdisk fdisk
     { };
 
 #endif

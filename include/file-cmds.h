@@ -58,6 +58,8 @@ namespace ushell
 
   };
 
+  //----------------------------------------------------------------------------
+
   class ush_mkdir : public ushell_cmd
   {
   public:
@@ -72,6 +74,8 @@ namespace ushell
 
   };
 
+  //----------------------------------------------------------------------------
+
   class ush_cd : public ushell_cmd
   {
   public:
@@ -85,6 +89,8 @@ namespace ushell
     do_cmd (class ushell* ush, int argc, char* argv[]);
 
   };
+
+  //----------------------------------------------------------------------------
 
   class ush_cp : public ushell_cmd
   {
@@ -105,6 +111,8 @@ namespace ushell
 
   };
 
+  //----------------------------------------------------------------------------
+
   class ush_pwd : public ushell_cmd
   {
   public:
@@ -118,6 +126,8 @@ namespace ushell
     do_cmd (class ushell* ush, int argc, char* argv[]);
 
   };
+
+  //----------------------------------------------------------------------------
 
   class ush_rm : public ushell_cmd
   {
@@ -138,6 +148,8 @@ namespace ushell
 
   };
 
+  //----------------------------------------------------------------------------
+
   class ush_cat : public ushell_cmd
   {
   public:
@@ -151,6 +163,8 @@ namespace ushell
     do_cmd (class ushell* ush, int argc, char* argv[]);
 
   };
+
+  //----------------------------------------------------------------------------
 
   class ush_fdisk : public ushell_cmd
   {
