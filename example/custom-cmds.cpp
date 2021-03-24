@@ -27,7 +27,6 @@
  * Created on: 4 February 2021 (LNP)
  */
 
-
 #include <cmsis-plus/rtos/os.h>
 #include <cmsis-plus/diag/trace.h>
 
@@ -75,8 +74,95 @@ namespace ushell
 
   //----------------------------------------------------------------------------
 
+  /**
+   * @brief Constructor for the "memory dump" class.
+   */
+  ush_mem_dump::ush_mem_dump (void)
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+    info_.command = "dump";
+    info_.help_text = "Dump memory content";
+  }
+
+  /**
+   * Destructor.
+   */
+  ush_mem_dump::~ush_mem_dump ()
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+  }
+
+  int
+  ush_mem_dump::do_cmd (class ushell* ush, int argc, char* argv[])
+  {
+    unsigned int address;
+    int len = default_len;
+
+    if (argc < 2 || !strcasecmp (argv[1], "-h"))
+      {
+        ush->printf (
+            "Usage:\t%s start [size]\n"
+            "\tnote: while <start> expects a hex value, <size> is decimal\n",
+            argv[0]);
+      }
+    else
+      {
+        if (argc >= 2)
+          {
+            sscanf (argv[1], "%x", &address);
+          }
+        if (argc > 2)
+          {
+            sscanf (argv[2], "%d", &len);
+          }
+
+        while (len > 0)
+          {
+            int count;
+
+            if (address % default_bytes)
+              {
+                count = default_bytes - (address % default_bytes);
+              }
+            else
+              {
+                count = (len - default_bytes) < 0 ? len : default_bytes;
+              }
+            ush->printf ("%06X  ", address);
+
+            // hex dump
+            uint8_t* tmp = (uint8_t*) address;
+            for (int i = 0; i < count; i++)
+              {
+                ush->printf ("%02X ", *(uint8_t*) address++);
+              }
+
+            // spaces between hex and ascii dumps
+            int padding = default_bytes - count + 1;
+            for (int i = 0; i < padding; i++)
+              {
+                ush->printf ("   ");
+              }
+
+            // ascii dump
+            for (int i = 0; i < count; i++, tmp++)
+              {
+                ush->printf ("%c", isprint (*tmp) ? *tmp : '.');
+              }
+            ush->printf ("\n");
+            len -= count;
+          }
+      }
+
+    return ush_ok;
+  }
+
+  //----------------------------------------------------------------------------
+
   ush_test test
     { };
 
+  ush_mem_dump dump
+    { };
 }
 

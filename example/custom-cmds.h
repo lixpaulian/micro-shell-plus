@@ -50,6 +50,23 @@ namespace ushell
     do_cmd (class ushell* ush, int argc, char* argv[]);
   };
 
+  class ush_mem_dump : public ushell_cmd
+  {
+  public:
+
+    ush_mem_dump (void);
+
+    virtual
+    ~ush_mem_dump () noexcept;
+
+    virtual int
+    do_cmd (class ushell* ush, int argc, char* argv[]);
+
+  private:
+    static constexpr int default_len = 256;
+    static constexpr int default_bytes = 16;
+  };
+
 }
 
 #endif /* __cplusplus */
