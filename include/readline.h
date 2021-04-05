@@ -53,6 +53,10 @@
 #define SHELL_MAX_LINE_LEN 256
 #endif
 
+#if !defined SHELL_FILE_HISTORY_LEN
+#define SHELL_FILE_HISTORY_LEN 1024
+#endif
+
 namespace ushell
 {
 
@@ -82,6 +86,9 @@ namespace ushell
 
     void
     init (os::posix::tty_canonical* tty, char const* file);
+
+    void
+    init (os::posix::tty_canonical* tty, char* history, size_t len);
 
     int
     readline (char const* prompt, void* buff, size_t len);
@@ -147,7 +154,8 @@ namespace ushell
       int16_t next;
     } hh_t;
 
-    char history_[1024];
+    char* history_ = nullptr;
+    size_t hist_len_ = 0;
     char* current_ = history_;
 
     char* raw_ = nullptr; // raw buffer, utf-8

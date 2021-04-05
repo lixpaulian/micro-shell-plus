@@ -63,8 +63,10 @@
 #include "readline.h"
 
 #ifndef countof
-# define countof(arr)  (sizeof(arr)/sizeof(arr[0]))
+#define countof(arr)  (sizeof(arr)/sizeof(arr[0]))
 #endif
+
+using namespace os;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -76,10 +78,44 @@ namespace ushell
       get_completion_
         { gc }
   {
+    trace::printf ("%s() %p\n", __func__, this);
   }
 
   read_line::~read_line ()
   {
+    trace::printf ("%s() %p\n", __func__, this);
+  }
+
+  void
+  read_line::init (os::posix::tty_canonical* tty, char* history, size_t len)
+  {
+    hh_t hh;
+
+    tty_ = tty;
+    history_ = history;
+    hist_len_ = len - 2;
+
+    // check if the history is consistent
+    uint16_t sum = 0;
+    for (size_t i = 0; i < hist_len_; i++)
+      {
+        sum += history_[i];
+      }
+    uint16_t have = history_[hist_len_] & 0xFF;
+    have += ((history_[hist_len_ + 1] & 0xFF) << 8);
+    if (sum != have)
+      {
+        // inconsistent, init the history; first add an empty entry
+        hh.prev = 0;
+        hh.next = sizeof(hh_t) + 1;
+        memcpy (history_, &hh, sizeof(hh_t));
+        history_[sizeof(hh_t)] = '\0';
+
+        // add behind the empty entry an "end of history" entry
+        hh.next = 0;
+        memcpy (history_ + sizeof(hh_t) + 1, &hh, sizeof(hh_t));
+      }
+    current_ = history_;
   }
 
   void
@@ -171,14 +207,22 @@ namespace ushell
             memcpy (p, &hh, sizeof(hh_t));
 
             // shift memory up to make space for the new entry
-            memmove (p + rec_len, p,
-                     sizeof(history_) - (rec_len + sizeof(hh_t) + 1));
+            memmove (p + rec_len, p, hist_len_ - (rec_len + sizeof(hh_t) + 1));
 
             hh.prev = sizeof(hh_t) + 1;
             hh.next = rec_len;
             memcpy (p, &hh, sizeof(hh_t));
             memcpy (p + sizeof(hh_t), string, strlen (string));
             p[rec_len - 1] = '\0';      // insert null terminator
+
+            // calculate the new checksum
+            uint16_t sum = 0;
+            for (size_t i = 0; i < hist_len_; i++)
+              {
+                sum += history_[i];
+              }
+            history_[hist_len_] = sum & 0xFF;
+            history_[hist_len_ + 1] = (sum >> 8) & 0xFF;
           }
         current_ = history_;            // reset history pointer
       }
@@ -728,13 +772,13 @@ namespace ushell
     if (hh.next)
       {
         if ((self->current_ + hh.next)
-            < (self->history_ + sizeof(self->history_) - sizeof(hh_t)))
+            < (self->history_ + self->hist_len_ - sizeof(hh_t)))
           {
             self->current_ += hh.next;
             memcpy (&hh, self->current_, sizeof(hh_t));
             if (hh.next != 0
                 && ((self->current_ + hh.next)
-                    < (self->history_ + sizeof(self->history_))))
+                    < (self->history_ + self->hist_len_)))
               {
                 self->set_text (self->current_ + sizeof(hh_t), 1);
               }
@@ -775,14 +819,14 @@ namespace ushell
         if (hh.next)
           {
             if ((self->current_ + hh.next)
-                < (self->history_ + sizeof(self->history_) - sizeof(hh_t)))
+                < (self->history_ + self->hist_len_ - sizeof(hh_t)))
               {
                 savep = self->current_;
                 self->current_ += hh.next;
                 memcpy (&hh, self->current_, sizeof(hh_t));
                 if (hh.next == 0
                     || ((self->current_ + hh.next)
-                        >= (self->history_ + sizeof(self->history_))))
+                        >= (self->history_ + self->hist_len_)))
                   {
                     break;
                   }
