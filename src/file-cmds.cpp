@@ -47,7 +47,7 @@ extern posix::chan_fatfs_file_system_lockable<rtos::mutex> fat_fs;
 namespace ushell
 {
 
-#if SHELL_FILE_CMDS == true
+#if SHELL_FILE_SUPPORT == true
 
 #define CWD_BUF_LEN 260
 #define FILE_BUFFER 4096

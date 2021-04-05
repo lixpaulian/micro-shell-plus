@@ -34,8 +34,8 @@
 
 #if defined (__cplusplus)
 
-#if !defined SHELL_FILE_CMDS
-#define SHELL_FILE_CMDS true
+#if !defined SHELL_FILE_SUPPORT
+#define SHELL_FILE_SUPPORT true
 #endif
 
 namespace ushell
