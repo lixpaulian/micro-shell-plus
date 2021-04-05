@@ -45,6 +45,8 @@
 #define SHELL_MAX_CMD_ARGS 10
 #endif
 
+char nvram_hist[1024] __attribute__((section(".nvram")));
+
 using namespace os;
 
 #pragma GCC diagnostic push
@@ -77,7 +79,7 @@ namespace ushell
     char prompt[] =
       { SHELL_PROMPT };
 
-#if SHELL_FILE_CMDS == true
+#if SHELL_FILE_SUPPORT == true
     ph.set_default ("/flash/");
 #endif
 
@@ -100,7 +102,11 @@ namespace ushell
             tio.c_lflag &= ~(ECHO | ICANON | IEXTEN);
             tio.c_cc[VMIN] = 1;
             tio.c_cc[VTIME] = 0;
-            rl.init (tty, nullptr);
+#if SHELL_HISTORY_ON_FILE != nullptr && SHELL_FILE_SUPPORT == true
+            rl.init (tty, SHELL_HISTORY_ON_FILE);
+#else
+            rl.init (tty, nvram_hist, sizeof(nvram_hist));
+#endif
 #else
             tio.c_lflag |= (ICANON | ECHO | ECHOE);
             tio.c_iflag |= (ICRNL | IMAXBEL);
