@@ -48,11 +48,15 @@
 #define SHELL_MAX_COMMANDS 40
 #endif
 
-#if !defined SHELL_FILE_CMDS
-#define SHELL_FILE_CMDS true
+#if !defined SHELL_FILE_SUPPORT
+#define SHELL_FILE_SUPPORT true
 #endif
 
-#if SHELL_FILE_CMDS == true
+#if !defined SHELL_HISTORY_ON_FILE
+#define SHELL_HISTORY_ON_FILE nullptr
+#endif
+
+#if SHELL_FILE_SUPPORT == true
 #include "path.h"
 #endif
 
@@ -111,7 +115,7 @@ namespace ushell
 
     static ushell_cmd* ushell_cmds_[SHELL_MAX_COMMANDS];
 
-#if SHELL_FILE_CMDS == true
+#if SHELL_FILE_SUPPORT == true
     path ph
       { };
 #endif
@@ -135,8 +139,8 @@ namespace ushell
 #endif
 
     static constexpr uint8_t VERSION_MAJOR = 0;
-    static constexpr uint8_t VERSION_MINOR = 2;
-    static constexpr uint8_t VERSION_PATCH = 4;
+    static constexpr uint8_t VERSION_MINOR = 3;
+    static constexpr uint8_t VERSION_PATCH = 0;
 
     const char* char_device_;
 
