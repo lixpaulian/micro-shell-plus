@@ -68,10 +68,12 @@ namespace ushell
   public:
 
     typedef
-    char const*
-    (rl_get_completion_fn) (char const* start, char const* cur_pos);
+    const char*
+    (rl_get_completion_fn) (const char* start, const char* cur_pos);
 
-    read_line (rl_get_completion_fn gc);
+    read_line (rl_get_completion_fn gc, char* history, size_t len);
+
+    read_line (rl_get_completion_fn gc, const char* file);
 
     read_line (const read_line&) = delete;
 
@@ -87,15 +89,10 @@ namespace ushell
     ~read_line () noexcept;
 
     void
-    init (os::posix::tty_canonical* tty, char* history, size_t len);
-
-#if SHELL_FILE_SUPPORT == true
-    void
-    init (os::posix::tty_canonical* tty, char const* file);
-#endif
+    initialise (os::posix::tty_canonical* tty);
 
     int
-    readline (char const* prompt, void* buff, size_t len);
+    readline (const char* prompt, void* buff, size_t len);
 
     void
     end (void);
@@ -108,22 +105,19 @@ namespace ushell
     exec_seq (char* seq);
 
     void
-    check_history (void);
-
-    void
-    history_add (char const* string);
+    history_add (const char* string);
 
     int
     out (const char* data, int size);
 
     rl_glyph_t
-    utf8_to_glyph (char const** utf8);
+    utf8_to_glyph (const char** utf8);
 
     rl_glyph_t*
-    utf8tog (rl_glyph_t* glyphs, char const* raw);
+    utf8tog (rl_glyph_t* glyphs, const char* raw);
 
     int
-    utf8_width (char const* raw);
+    utf8_width (const char* raw);
 
     int
     one_gtoutf8 (char* raw, rl_glyph_t glyph);
@@ -132,7 +126,7 @@ namespace ushell
     gtoutf8 (char* raw, rl_glyph_t const* glyphs, int count);
 
     int
-    skip_char_seq (char const* start);
+    skip_char_seq (const char* start);
 
     void
     move (int count);
@@ -144,10 +138,10 @@ namespace ushell
     write_part (int start, int length);
 
     void
-    set_text (char const* text, int redraw);
+    set_text (const char* text, int redraw);
 
     void
-    insert_seq (char const* seq);
+    insert_seq (const char* seq);
 
     int
     next_word (void);
@@ -164,10 +158,12 @@ namespace ushell
       int16_t next;
     } hh_t;
 
-    char* history_ = nullptr;
-    size_t hist_len_ = 0;
-    char* current_ = history_;
-    char const* file_ = nullptr;
+    rl_get_completion_fn* get_completion_;
+
+    char* history_;
+    size_t hist_len_;
+    char* current_;
+    const char* file_;
 
     char* raw_ = nullptr; // raw buffer, utf-8
     size_t raw_len_ = 0;  // length of the raw buffer
@@ -180,8 +176,6 @@ namespace ushell
     bool finish_ = false;
 
     os::posix::tty_canonical* tty_ = nullptr;
-
-    rl_get_completion_fn* get_completion_;
 
     static constexpr const char* bs = "\b";
 
@@ -243,7 +237,7 @@ namespace ushell
 
     typedef struct _rl_command
     {
-      char const seq[8];
+      const char seq[8];
       void
       (*handler) (class read_line*);
     } rl_command_t;

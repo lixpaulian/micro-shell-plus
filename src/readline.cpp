@@ -78,9 +78,23 @@ using namespace os;
 namespace ushell
 {
 
-  read_line::read_line (rl_get_completion_fn gc) :
+  read_line::read_line (rl_get_completion_fn gc, char* history, size_t len) :
       get_completion_
-        { gc }
+        { gc }, //
+      history_
+        { history }, //
+      hist_len_
+        { len - 2 }
+  {
+    file_ = nullptr;
+    trace::printf ("%s() %p\n", __func__, this);
+  }
+
+  read_line::read_line (rl_get_completion_fn gc, const char* file) :
+      get_completion_
+        { gc }, //
+      file_
+        { file }
   {
     trace::printf ("%s() %p\n", __func__, this);
   }
@@ -90,57 +104,58 @@ namespace ushell
     trace::printf ("%s() %p\n", __func__, this);
   }
 
+#if 0
   void
-  read_line::init (os::posix::tty_canonical* tty, char* history, size_t len)
+  read_line::initialise (os::posix::tty_canonical* tty)
   {
     tty_ = tty;
     history_ = history;
     hist_len_ = len - 2;
     check_history ();
   }
-
-#if SHELL_FILE_SUPPORT == true
-  void
-  read_line::init (os::posix::tty_canonical* tty, char const* file)
-  {
-    // init tty
-    tty_ = tty;
-    file_ = file;
-
-    bool result = false;
-    struct stat st;
-    int res = posix::stat (file, &st);
-    if (res == 0 && st.st_size)
-      {
-        posix::io* f = posix::open (file, O_RDONLY);
-        if (f)
-          {
-            history_ = new char[st.st_size];
-            assert(history_);
-            hist_len_ = st.st_size - 2;
-            if (f->read (history_, st.st_size))
-              {
-                result = true;
-              }
-            f->close ();
-          }
-      }
-    if (!result)
-      {
-        // history file not found or read failed
-        history_ = new char[SHELL_FILE_HISTORY_LEN];
-        hist_len_ = SHELL_FILE_HISTORY_LEN - 2;
-      }
-    check_history ();
-  }
 #endif
 
   void
-  read_line::check_history (void)
+  read_line::initialise (os::posix::tty_canonical* tty)
   {
-    // check if the history is consistent
-    hh_t hh;
+    // init tty
+    tty_ = tty;
 
+#if SHELL_FILE_SUPPORT == true
+    if (file_)
+      {
+        bool result = false;
+        struct stat st;
+        int res = posix::stat (file_, &st);
+        if (res == 0 && st.st_size)
+          {
+            posix::io* f = posix::open (file_, O_RDONLY);
+            if (f)
+              {
+                history_ = new char[st.st_size];
+                assert(history_);
+                hist_len_ = st.st_size - 2;
+                if (f->read (history_, st.st_size))
+                  {
+                    result = true;
+                  }
+                f->close ();
+              }
+          }
+        if (!result)
+          {
+            // history file not found or read failed
+            history_ = new char[SHELL_FILE_HISTORY_LEN];
+            assert(history_);
+            hist_len_ = SHELL_FILE_HISTORY_LEN - 2;
+          }
+      }
+#endif
+
+    assert(history_);
+    assert(hist_len_);
+
+    // check if the history is consistent
     uint16_t sum = 0;
     for (size_t i = 0; i < hist_len_; i++)
       {
@@ -150,7 +165,9 @@ namespace ushell
     have += ((history_[hist_len_ + 1] & 0xFF) << 8);
     if (sum != have)
       {
-        // inconsistent, init the history; first add an empty entry
+        // inconsistent, initialise the history; first add an empty entry
+        hh_t hh;
+
         hh.prev = 0;
         hh.next = sizeof(hh_t) + 1;
         memcpy (history_, &hh, sizeof(hh_t));
@@ -164,7 +181,7 @@ namespace ushell
   }
 
   int
-  read_line::readline (char const* prompt, void* buff, size_t len)
+  read_line::readline (const char* prompt, void* buff, size_t len)
   {
     const char nl[] =
       { "\n" };
@@ -211,6 +228,7 @@ namespace ushell
   void
   read_line::end (void)
   {
+#if SHELL_FILE_SUPPORT == true
     if (file_)
       {
         posix::io* f = posix::open (file_, O_WRONLY | O_CREAT);
@@ -220,12 +238,13 @@ namespace ushell
             f->close ();
           }
       }
+#endif
   }
 
   //----------------------------------------------------------------------------
 
   void
-  read_line::history_add (char const* string)
+  read_line::history_add (const char* string)
   {
     if (*string)
       {
@@ -273,10 +292,10 @@ namespace ushell
   }
 
   read_line::rl_glyph_t
-  read_line::utf8_to_glyph (char const** utf8)
+  read_line::utf8_to_glyph (const char** utf8)
   {
     rl_glyph_t glyph = 0;
-    char const* raw = *utf8;
+    const char* raw = *utf8;
 
     if (!(*raw & 0x80))
       {
@@ -313,7 +332,7 @@ namespace ushell
   }
 
   read_line::rl_glyph_t*
-  read_line::utf8tog (rl_glyph_t* glyphs, char const* raw)
+  read_line::utf8tog (rl_glyph_t* glyphs, const char* raw)
   {
     while (*raw)
       {
@@ -332,7 +351,7 @@ namespace ushell
   }
 
   int
-  read_line::utf8_width (char const* raw)
+  read_line::utf8_width (const char* raw)
   {
     int count = 0;
     while (*raw)
@@ -390,9 +409,9 @@ namespace ushell
   }
 
   int
-  read_line::skip_char_seq (char const* start)
+  read_line::skip_char_seq (const char* start)
   {
-    char const* raw = start;
+    const char* raw = start;
 
 #if SHELL_UTF8_SUPPORT == true
     rl_glyph_t glyph = utf8_to_glyph (&raw);
@@ -531,7 +550,7 @@ namespace ushell
   }
 
   void
-  read_line::set_text (char const* text, int redraw)
+  read_line::set_text (const char* text, int redraw)
   {
     if (redraw)
       {
@@ -561,7 +580,7 @@ namespace ushell
   }
 
   void
-  read_line::insert_seq (char const* seq)
+  read_line::insert_seq (const char* seq)
   {
 #if SHELL_UTF8_SUPPORT == true
     int count = utf8_width (seq);
@@ -904,7 +923,7 @@ namespace ushell
 #else
       char* cur_pos = self->raw_ + self->cur_pos_;
 #endif
-    char const* insert = (self->get_completion_) (start, cur_pos);
+    const char* insert = (self->get_completion_) (start, cur_pos);
     if (insert)
       {
         self->insert_seq (insert);
