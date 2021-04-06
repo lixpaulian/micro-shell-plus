@@ -102,8 +102,8 @@ namespace ushell
             tio.c_lflag &= ~(ECHO | ICANON | IEXTEN);
             tio.c_cc[VMIN] = 1;
             tio.c_cc[VTIME] = 0;
-#if SHELL_HISTORY_ON_FILE != nullptr && SHELL_FILE_SUPPORT == true
-            rl.init (tty, SHELL_HISTORY_ON_FILE);
+#if defined SHELL_HISTORY_FILE && SHELL_FILE_SUPPORT == true
+            rl.init (tty, SHELL_HISTORY_FILE);
 #else
             rl.init (tty, nvram_hist, sizeof(nvram_hist));
 #endif

@@ -49,11 +49,7 @@
 #endif
 
 #if !defined SHELL_FILE_SUPPORT
-#define SHELL_FILE_SUPPORT true
-#endif
-
-#if !defined SHELL_HISTORY_ON_FILE
-#define SHELL_HISTORY_ON_FILE nullptr
+#define SHELL_FILE_SUPPORT false
 #endif
 
 #if SHELL_FILE_SUPPORT == true
@@ -140,7 +136,7 @@ namespace ushell
 
     static constexpr uint8_t VERSION_MAJOR = 0;
     static constexpr uint8_t VERSION_MINOR = 3;
-    static constexpr uint8_t VERSION_PATCH = 0;
+    static constexpr uint8_t VERSION_PATCH = 1;
 
     const char* char_device_;
 
