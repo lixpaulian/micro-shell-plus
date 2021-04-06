@@ -39,6 +39,4 @@
 
 #define SHELL_FILE_SUPPORT true
 
-#define SHELL_HISTORY_FILE "/flash/history.txt"
-
 #endif /* EXAMPLE_USHELL_OPTS_H_ */

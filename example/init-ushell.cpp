@@ -40,6 +40,7 @@
 #include "init-ushell.h"
 
 #define STATIC_USHELL true
+#define SHELL_HISTORY_FILE "/flash/history.txt"
 
 char nvram_hist[1024] __attribute__((section(".nvram")));
 
