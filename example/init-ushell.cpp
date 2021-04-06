@@ -39,7 +39,7 @@
 
 #include "init-ushell.h"
 
-#define STATIC_USHELL true
+#define STATIC_USHELL false
 #define SHELL_HISTORY_FILE "/flash/history.txt"
 
 char nvram_hist[1024] __attribute__((section(".nvram")));
@@ -88,8 +88,11 @@ ush_th (void* args)
       ush_cdc0.do_ushell (nullptr);
     }
 #else
+  ushell::read_line* rl = new ushell::read_line
+    { nullptr, nvram_hist, sizeof(nvram_hist) };
+
   ushell::ushell* ushc = new ushell::ushell
-    { (char*) args };
+    { (char*) args, rl };
 
   void* ret = ushc->do_ushell (nullptr);
   delete ushc;
