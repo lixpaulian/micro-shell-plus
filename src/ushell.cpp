@@ -45,8 +45,6 @@
 #define SHELL_MAX_CMD_ARGS 10
 #endif
 
-char nvram_hist[1024] __attribute__((section(".nvram")));
-
 using namespace os;
 
 #pragma GCC diagnostic push
@@ -58,8 +56,17 @@ namespace ushell
   class ushell_cmd* ushell::ushell_cmds_[SHELL_MAX_COMMANDS];
 
   ushell::ushell (const char* char_device) :
+      ushell
+        { char_device, nullptr }
+  {
+    trace::printf ("%s() %p\n", __func__, this);
+  }
+
+  ushell::ushell (const char* char_device, class read_line* rl) :
       char_device_
-        { char_device }
+        { char_device }, //
+      rl_
+        { rl }
   {
     trace::printf ("%s() %p\n", __func__, this);
   }
@@ -95,25 +102,24 @@ namespace ushell
             // configure the tty in canonical mode
             memcpy (&tio_orig, &tio, sizeof(struct termios));
 
-#if SHELL_USE_READLINE == true
-            tio.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-            tio.c_oflag |= (OPOST | ONLCR);
-            tio.c_cflag |= CS8;
-            tio.c_lflag &= ~(ECHO | ICANON | IEXTEN);
-            tio.c_cc[VMIN] = 1;
-            tio.c_cc[VTIME] = 0;
-#if defined SHELL_HISTORY_FILE && SHELL_FILE_SUPPORT == true
-            rl.init (tty, SHELL_HISTORY_FILE);
-#else
-            rl.init (tty, nvram_hist, sizeof(nvram_hist));
-#endif
-#else
-            tio.c_lflag |= (ICANON | ECHO | ECHOE);
-            tio.c_iflag |= (ICRNL | IMAXBEL);
-            tio.c_oflag |= (OPOST | ONLCR);
-            tio.c_cc[VEOF] = 4;   // ctrl-d
-            tio.c_cc[VERASE] = '\b';
-#endif
+            if (rl_)
+              {
+                tio.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+                tio.c_oflag |= (OPOST | ONLCR);
+                tio.c_cflag |= CS8;
+                tio.c_lflag &= ~(ECHO | ICANON | IEXTEN);
+                tio.c_cc[VMIN] = 1;
+                tio.c_cc[VTIME] = 0;
+                rl_->initialise (tty);
+              }
+            else
+              {
+                tio.c_lflag |= (ICANON | ECHO | ECHOE);
+                tio.c_iflag |= (ICRNL | IMAXBEL);
+                tio.c_oflag |= (OPOST | ONLCR);
+                tio.c_cc[VEOF] = 4;   // ctrl-d
+                tio.c_cc[VERASE] = '\b';
+              }
 
             if (!((tty->tcsetattr (TCSANOW, &tio)) < 0))
               {
@@ -121,12 +127,16 @@ namespace ushell
 
                 do
                   {
-#if SHELL_USE_READLINE == true
-                    if ((c = rl.readline (prompt, buffer, sizeof(buffer))) > 0)
-#else
-                    tty->write (prompt, strlen (prompt));
-                    if ((c = tty->read (buffer, sizeof(buffer))) > 0)
-#endif
+                    if (rl_)    // use readline
+                      {
+                        c = rl_->readline (prompt, buffer, sizeof(buffer));
+                      }
+                    else        // no readline
+                      {
+                        tty->write (prompt, strlen (prompt));
+                        c = tty->read (buffer, sizeof(buffer));
+                      }
+                    if (c > 0)
                       {
                         p = buffer;
                         for (int n = 0; n < c; n++, p++)
@@ -157,9 +167,10 @@ namespace ushell
 
                 // restore the original tty settings
                 tty->tcsetattr (TCSANOW, &tio_orig);
-#if SHELL_USE_READLINE == true
-                rl.end ();
-#endif
+                if (rl_)
+                  {
+                    rl_->end ();
+                  }
               }
             tty->close ();
           }

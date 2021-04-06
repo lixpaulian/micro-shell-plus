@@ -40,10 +40,6 @@
 #define SHELL_MAX_LINE_LEN 256
 #endif
 
-#if !defined SHELL_USE_READLINE
-#define SHELL_USE_READLINE true
-#endif
-
 #if !defined SHELL_MAX_COMMANDS
 #define SHELL_MAX_COMMANDS 40
 #endif
@@ -79,6 +75,8 @@ namespace ushell
   public:
 
     ushell (const char* char_device);
+
+    ushell (const char* char_device, class read_line* rl);
 
     ushell (const ushell&) = delete;
 
@@ -129,16 +127,14 @@ namespace ushell
     int
     cmd_parser (char* buff);
 
-#if SHELL_USE_READLINE == true
-    read_line rl
-      { nullptr };
-#endif
+    const char* char_device_;
+
+    read_line* rl_;
 
     static constexpr uint8_t VERSION_MAJOR = 0;
-    static constexpr uint8_t VERSION_MINOR = 3;
-    static constexpr uint8_t VERSION_PATCH = 1;
+    static constexpr uint8_t VERSION_MINOR = 4;
+    static constexpr uint8_t VERSION_PATCH = 0;
 
-    const char* char_device_;
 
   };
 
