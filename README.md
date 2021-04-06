@@ -2,7 +2,7 @@
 An extensible shell written in C++ for embedded systems. It was specifically developed for µOS++ but it can be ported to other POSIX compliant RTOSes.
 
 ## Version
-* 0.3.1 under development (6 April 2021)
+* 0.4.0 under development (6 April 2021)
 
 ## License
 * MIT
