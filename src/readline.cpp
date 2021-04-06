@@ -62,6 +62,10 @@
 
 #include "readline.h"
 
+#if SHELL_FILE_SUPPORT == true
+#include <fcntl.h>
+#endif
+
 #ifndef countof
 #define countof(arr)  (sizeof(arr)/sizeof(arr[0]))
 #endif
@@ -89,13 +93,54 @@ namespace ushell
   void
   read_line::init (os::posix::tty_canonical* tty, char* history, size_t len)
   {
-    hh_t hh;
-
     tty_ = tty;
     history_ = history;
     hist_len_ = len - 2;
+    check_history ();
+  }
 
+#if SHELL_FILE_SUPPORT == true
+  void
+  read_line::init (os::posix::tty_canonical* tty, char const* file)
+  {
+    // init tty
+    tty_ = tty;
+    file_ = file;
+
+    bool result = false;
+    struct stat st;
+    int res = posix::stat (file, &st);
+    if (res == 0 && st.st_size)
+      {
+        posix::io* f = posix::open (file, O_RDONLY);
+        if (f)
+          {
+            history_ = new char[st.st_size];
+            assert(history_);
+            hist_len_ = st.st_size - 2;
+            if (f->read (history_, st.st_size))
+              {
+                result = true;
+              }
+            f->close ();
+          }
+      }
+    if (!result)
+      {
+        // history file not found or read failed
+        history_ = new char[SHELL_FILE_HISTORY_LEN];
+        hist_len_ = SHELL_FILE_HISTORY_LEN - 2;
+      }
+    check_history ();
+  }
+#endif
+
+  void
+  read_line::check_history (void)
+  {
     // check if the history is consistent
+    hh_t hh;
+
     uint16_t sum = 0;
     for (size_t i = 0; i < hist_len_; i++)
       {
@@ -115,26 +160,6 @@ namespace ushell
         hh.next = 0;
         memcpy (history_ + sizeof(hh_t) + 1, &hh, sizeof(hh_t));
       }
-    current_ = history_;
-  }
-
-  void
-  read_line::init (os::posix::tty_canonical* tty, char const* file) // todo: load history file
-  {
-    hh_t hh;
-
-    // init tty
-    tty_ = tty;
-
-    // init the history, first add an empty entry
-    hh.prev = 0;
-    hh.next = sizeof(hh_t) + 1;
-    memcpy (history_, &hh, sizeof(hh_t));
-    history_[sizeof(hh_t)] = '\0';
-
-    // add behind the empty entry an "end of history" entry
-    hh.next = 0;
-    memcpy (history_ + sizeof(hh_t) + 1, &hh, sizeof(hh_t));
     current_ = history_;
   }
 
@@ -186,7 +211,15 @@ namespace ushell
   void
   read_line::end (void)
   {
-    // TODO clean-up
+    if (file_)
+      {
+        posix::io* f = posix::open (file_, O_WRONLY | O_CREAT);
+        if (f)
+          {
+            f->write (history_, hist_len_ + 2);
+            f->close ();
+          }
+      }
   }
 
   //----------------------------------------------------------------------------
@@ -199,32 +232,37 @@ namespace ushell
         hh_t hh;
         char* p = history_ + sizeof(hh_t) + 1; // skip the empty entry
 
-        memcpy (&hh, p, sizeof(hh_t));
-        if (strncmp (p + sizeof(hh_t), string, strlen (string)))
+        if (rlmx_.lock () == rtos::result::ok)
           {
-            size_t rec_len = sizeof(hh_t) + strlen (string) + 1; // + null terminator
-            hh.prev = rec_len;
-            memcpy (p, &hh, sizeof(hh_t));
-
-            // shift memory up to make space for the new entry
-            memmove (p + rec_len, p, hist_len_ - (rec_len + sizeof(hh_t) + 1));
-
-            hh.prev = sizeof(hh_t) + 1;
-            hh.next = rec_len;
-            memcpy (p, &hh, sizeof(hh_t));
-            memcpy (p + sizeof(hh_t), string, strlen (string));
-            p[rec_len - 1] = '\0';      // insert null terminator
-
-            // calculate the new checksum
-            uint16_t sum = 0;
-            for (size_t i = 0; i < hist_len_; i++)
+            memcpy (&hh, p, sizeof(hh_t));
+            if (strncmp (p + sizeof(hh_t), string, strlen (string)))
               {
-                sum += history_[i];
+                size_t rec_len = sizeof(hh_t) + strlen (string) + 1; // + null terminator
+                hh.prev = rec_len;
+                memcpy (p, &hh, sizeof(hh_t));
+
+                // shift memory up to make space for the new entry
+                memmove (p + rec_len, p,
+                         hist_len_ - (rec_len + sizeof(hh_t) + 1));
+
+                hh.prev = sizeof(hh_t) + 1;
+                hh.next = rec_len;
+                memcpy (p, &hh, sizeof(hh_t));
+                memcpy (p + sizeof(hh_t), string, strlen (string));
+                p[rec_len - 1] = '\0'; // insert null terminator
+
+                // calculate the new checksum
+                uint16_t sum = 0;
+                for (size_t i = 0; i < hist_len_; i++)
+                  {
+                    sum += history_[i];
+                  }
+                history_[hist_len_] = sum & 0xFF;
+                history_[hist_len_ + 1] = (sum >> 8) & 0xFF;
               }
-            history_[hist_len_] = sum & 0xFF;
-            history_[hist_len_ + 1] = (sum >> 8) & 0xFF;
+            current_ = history_;            // reset history pointer
+            rlmx_.unlock ();
           }
-        current_ = history_;            // reset history pointer
       }
   }
 
@@ -361,7 +399,7 @@ namespace ushell
 
     if (glyph != '\033')
 #else
-    if (*raw++ != '\033')
+      if (*raw++ != '\033')
 #endif
       {
         return raw - start;
@@ -418,8 +456,8 @@ namespace ushell
               }
           }
 #else
-        count = std::min (count, (int) strlen (raw_ + cur_pos_));
-        out (raw_ + cur_pos_, count);
+          count = std::min (count, (int) strlen (raw_ + cur_pos_));
+          out (raw_ + cur_pos_, count);
 #endif
       }
     return;
@@ -443,7 +481,7 @@ namespace ushell
           }
       }
 #else
-    out (raw_ + cur_pos_, strlen (raw_ + cur_pos_));
+      out (raw_ + cur_pos_, strlen (raw_ + cur_pos_));
 #endif
 
     buf[0] = ' ';
@@ -478,17 +516,17 @@ namespace ushell
           }
       }
 #else
-    int count;
+      int count;
 
-    if (length < 0)
-      {
-        count = strlen (raw_ + start);
-      }
-    else
-      {
-        count = std::min (length, (int) strlen (raw_ + start));
-      }
-    out (raw_ + start, count);
+      if (length < 0)
+        {
+          count = strlen (raw_ + start);
+        }
+      else
+        {
+          count = std::min (length, (int) strlen (raw_ + start));
+        }
+      out (raw_ + start, count);
 #endif
   }
 
@@ -509,7 +547,7 @@ namespace ushell
     *end = '\0';
     length_ = cur_pos_ = end - line_;
 #else
-    length_ = cur_pos_ = strlen (text);
+      length_ = cur_pos_ = strlen (text);
 #endif
 
     if (redraw)
@@ -543,22 +581,22 @@ namespace ushell
         line_[length_] = 0;
       }
 #else
-    int count = strlen (seq);
-    int max_count = raw_len_ - length_ - 1;
+      int count = strlen (seq);
+      int max_count = raw_len_ - length_ - 1;
 
-    count = std::min (count, max_count);
+      count = std::min (count, max_count);
 
-    if (count)
-      {
-        if (length_ - cur_pos_)
-          {
-            memmove (raw_ + cur_pos_ + count, raw_ + cur_pos_,
-                     (length_ - cur_pos_));
-          }
-        memcpy (raw_ + cur_pos_, seq, strlen (seq));
-        length_ += count;
-        raw_[length_] = 0;
-      }
+      if (count)
+        {
+          if (length_ - cur_pos_)
+            {
+              memmove (raw_ + cur_pos_ + count, raw_ + cur_pos_,
+                  (length_ - cur_pos_));
+            }
+          memcpy (raw_ + cur_pos_, seq, strlen (seq));
+          length_ += count;
+          raw_[length_] = 0;
+        }
 #endif
     write_part (cur_pos_, count);
     cur_pos_ += count;
@@ -597,7 +635,7 @@ namespace ushell
 #if SHELL_UTF8_SUPPORT == true
     while (pos < length && line_[pos] != ' ')
 #else
-    while (pos < length && raw_[pos] != ' ')
+      while (pos < length && raw_[pos] != ' ')
 #endif
       {
         ++pos;
@@ -606,7 +644,7 @@ namespace ushell
 #if SHELL_UTF8_SUPPORT == true
     while (pos < length && line_[pos] == ' ')
 #else
-    while (pos < length && raw_[pos] == ' ')
+      while (pos < length && raw_[pos] == ' ')
 #endif
       {
         ++pos;
@@ -629,8 +667,8 @@ namespace ushell
         memmove (line_ + cur_pos_, line_ + cur_pos_ + count,
                  (length_ - cur_pos_ - count + 1) * sizeof(rl_glyph_t));
 #else
-        memmove (raw_ + cur_pos_, raw_ + cur_pos_ + count,
-                 (length_ - cur_pos_ - count + 1));
+          memmove (raw_ + cur_pos_, raw_ + cur_pos_ + count,
+              (length_ - cur_pos_ - count + 1));
 #endif
         length_ -= count;
         update_tail (count);
@@ -684,7 +722,7 @@ namespace ushell
 #if SHELL_UTF8_SUPPORT == true
     while (pos && self->line_[pos - 1] == ' ')
 #else
-    while (pos && self->raw_[pos - 1] == ' ')
+      while (pos && self->raw_[pos - 1] == ' ')
 #endif
       {
         --pos;
@@ -693,7 +731,7 @@ namespace ushell
 #if SHELL_UTF8_SUPPORT == true
     while (pos && self->line_[pos - 1] != ' ')
 #else
-    while (pos && self->raw_[pos - 1] != ' ')
+      while (pos && self->raw_[pos - 1] != ' ')
 #endif
       {
         --pos;
@@ -864,7 +902,7 @@ namespace ushell
     self->gtoutf8 (cur_pos, self->line_ + self->cur_pos_,
                    self->length_ - self->cur_pos_);
 #else
-    char* cur_pos = self->raw_ + self->cur_pos_;
+      char* cur_pos = self->raw_ + self->cur_pos_;
 #endif
     char const* insert = (self->get_completion_) (start, cur_pos);
     if (insert)

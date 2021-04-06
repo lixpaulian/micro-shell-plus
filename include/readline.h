@@ -43,6 +43,8 @@
 #include "tty-canonical.h"
 #include "ushell-opts.h"
 
+#include <cmsis-plus/posix-io/chan-fatfs-file-system.h>
+
 #if defined (__cplusplus)
 
 #if !defined SHELL_UTF8_SUPPORT
@@ -85,10 +87,12 @@ namespace ushell
     ~read_line () noexcept;
 
     void
-    init (os::posix::tty_canonical* tty, char const* file);
-
-    void
     init (os::posix::tty_canonical* tty, char* history, size_t len);
+
+#if SHELL_FILE_SUPPORT == true
+    void
+    init (os::posix::tty_canonical* tty, char const* file);
+#endif
 
     int
     readline (char const* prompt, void* buff, size_t len);
@@ -102,6 +106,9 @@ namespace ushell
 
     bool
     exec_seq (char* seq);
+
+    void
+    check_history (void);
 
     void
     history_add (char const* string);
@@ -148,6 +155,9 @@ namespace ushell
     void
     delete_n (int count);
 
+    os::rtos::mutex rlmx_
+      { "rl-mutex" };
+
     typedef struct hist_header
     {
       int16_t prev;
@@ -157,6 +167,7 @@ namespace ushell
     char* history_ = nullptr;
     size_t hist_len_ = 0;
     char* current_ = history_;
+    char const* file_ = nullptr;
 
     char* raw_ = nullptr; // raw buffer, utf-8
     size_t raw_len_ = 0;  // length of the raw buffer
