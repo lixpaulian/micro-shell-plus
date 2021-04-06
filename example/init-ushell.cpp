@@ -41,6 +41,8 @@
 
 #define STATIC_USHELL true
 
+char nvram_hist[1024] __attribute__((section(".nvram")));
+
 using namespace os;
 using namespace os::rtos;
 
@@ -53,8 +55,11 @@ static constexpr std::size_t th_stack_size = 4096;
 
 #if STATIC_USHELL == true
 
+ushell::read_line rl
+  { nullptr, nvram_hist, sizeof(nvram_hist) };
+
 ushell::ushell ush_cdc0
-  { "/dev/cdc0" };
+  { "/dev/cdc0", &rl };
 
 thread_inclusive<th_stack_size> ush_cdc0_th
   { "ush_cdc0", ush_th, nullptr };
