@@ -102,40 +102,32 @@ namespace ushell
             // configure the tty in canonical mode
             memcpy (&tio_orig, &tio, sizeof(struct termios));
 
-            if (rl_)
-              {
-                tio.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-                tio.c_oflag |= (OPOST | ONLCR);
-                tio.c_cflag |= CS8;
-                tio.c_lflag &= ~(ECHO | ICANON | IEXTEN);
-                tio.c_cc[VMIN] = 1;
-                tio.c_cc[VTIME] = 0;
-                rl_->initialise (tty);
-              }
-            else
-              {
-                tio.c_lflag |= (ICANON | ECHO | ECHOE);
-                tio.c_iflag |= (ICRNL | IMAXBEL);
-                tio.c_oflag |= (OPOST | ONLCR);
-                tio.c_cc[VEOF] = 4;   // ctrl-d
-                tio.c_cc[VERASE] = '\b';
-              }
-
+#if SHELL_USE_READLINE == true
+            tio.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+            tio.c_oflag |= (OPOST | ONLCR);
+            tio.c_cflag |= CS8;
+            tio.c_lflag &= ~(ECHO | ICANON | IEXTEN);
+            tio.c_cc[VMIN] = 1;
+            tio.c_cc[VTIME] = 0;
+            rl_->initialise (tty);
+#else
+            tio.c_lflag |= (ICANON | ECHO | ECHOE);
+            tio.c_iflag |= (ICRNL | IMAXBEL);
+            tio.c_oflag |= (OPOST | ONLCR);
+            tio.c_cc[VEOF] = 4;   // ctrl-d
+            tio.c_cc[VERASE] = '\b';
+#endif
             if (!((tty->tcsetattr (TCSANOW, &tio)) < 0))
               {
                 tty->write (greet, strlen (greet));
-
                 do
                   {
-                    if (rl_)    // use readline
-                      {
-                        c = rl_->readline (prompt, buffer, sizeof(buffer));
-                      }
-                    else        // no readline
-                      {
-                        tty->write (prompt, strlen (prompt));
-                        c = tty->read (buffer, sizeof(buffer));
-                      }
+#if SHELL_USE_READLINE == true
+                    c = rl_->readline (prompt, buffer, sizeof(buffer));
+#else
+                    tty->write (prompt, strlen (prompt));
+                    c = tty->read (buffer, sizeof(buffer));
+#endif
                     if (c > 0)
                       {
                         p = buffer;
@@ -167,10 +159,9 @@ namespace ushell
 
                 // restore the original tty settings
                 tty->tcsetattr (TCSANOW, &tio_orig);
-                if (rl_)
-                  {
-                    rl_->end ();
-                  }
+#if SHELL_USE_READLINE == true
+                rl_->end ();
+#endif
               }
             tty->close ();
           }
