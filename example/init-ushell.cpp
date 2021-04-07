@@ -39,10 +39,12 @@
 
 #include "init-ushell.h"
 
-#define STATIC_USHELL false
+#define STATIC_USHELL true
 #define SHELL_HISTORY_FILE "/flash/history.txt"
 
+#if !defined SHELL_HISTORY_FILE
 char nvram_hist[1024] __attribute__((section(".nvram")));
+#endif
 
 using namespace os;
 using namespace os::rtos;
@@ -55,16 +57,22 @@ ush_th (void* args);
 static constexpr std::size_t th_stack_size = 4096;
 
 #if STATIC_USHELL == true
-
+#if SHELL_USE_READLINE == true
+#if defined SHELL_HISTORY_FILE
+ushell::read_line rl
+  { nullptr, SHELL_HISTORY_FILE };
+#else
 ushell::read_line rl
   { nullptr, nvram_hist, sizeof(nvram_hist) };
-
+#endif
 ushell::ushell ush_cdc0
   { "/dev/cdc0", &rl };
-
+#else
+ushell::ushell ush_cdc0
+  { "/dev/cdc0"};
+#endif
 thread_inclusive<th_stack_size> ush_cdc0_th
   { "ush_cdc0", ush_th, nullptr };
-
 #endif
 
 #pragma GCC diagnostic push
@@ -88,12 +96,21 @@ ush_th (void* args)
       ush_cdc0.do_ushell (nullptr);
     }
 #else
+#if SHELL_USE_READLINE == true
+#if defined SHELL_HISTORY_FILE
+  ushell::read_line* rl = new ushell::read_line
+     { nullptr, SHELL_HISTORY_FILE };
+#else
   ushell::read_line* rl = new ushell::read_line
     { nullptr, nvram_hist, sizeof(nvram_hist) };
+#endif
 
   ushell::ushell* ushc = new ushell::ushell
     { (char*) args, rl };
-
+#else
+  ushell::ushell* ushc = new ushell::ushell
+     { (char*) args };
+#endif
   void* ret = ushc->do_ushell (nullptr);
   delete ushc;
 
