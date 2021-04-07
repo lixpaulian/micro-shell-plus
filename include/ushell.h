@@ -44,6 +44,10 @@
 #define SHELL_MAX_COMMANDS 40
 #endif
 
+#if !defined SHELL_USE_READLINE
+#define SHELL_USE_READLINE true
+#endif
+
 #if !defined SHELL_FILE_SUPPORT
 #define SHELL_FILE_SUPPORT false
 #endif
@@ -133,8 +137,7 @@ namespace ushell
 
     static constexpr uint8_t VERSION_MAJOR = 0;
     static constexpr uint8_t VERSION_MINOR = 4;
-    static constexpr uint8_t VERSION_PATCH = 0;
-
+    static constexpr uint8_t VERSION_PATCH = 1;
 
   };
 
