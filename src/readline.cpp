@@ -104,21 +104,9 @@ namespace ushell
     trace::printf ("%s() %p\n", __func__, this);
   }
 
-#if 0
   void
   read_line::initialise (os::posix::tty_canonical* tty)
   {
-    tty_ = tty;
-    history_ = history;
-    hist_len_ = len - 2;
-    check_history ();
-  }
-#endif
-
-  void
-  read_line::initialise (os::posix::tty_canonical* tty)
-  {
-    // init tty
     tty_ = tty;
 
 #if SHELL_FILE_SUPPORT == true
@@ -256,7 +244,8 @@ namespace ushell
             memcpy (&hh, p, sizeof(hh_t));
             if (strncmp (p + sizeof(hh_t), string, strlen (string)))
               {
-                size_t rec_len = sizeof(hh_t) + strlen (string) + 1; // + null terminator
+                // +1 = null terminator
+                size_t rec_len = sizeof(hh_t) + strlen (string) + 1;
                 hh.prev = rec_len;
                 memcpy (p, &hh, sizeof(hh_t));
 
@@ -279,7 +268,7 @@ namespace ushell
                 history_[hist_len_] = sum & 0xFF;
                 history_[hist_len_ + 1] = (sum >> 8) & 0xFF;
               }
-            current_ = history_;            // reset history pointer
+            current_ = history_;        // reset history pointer
             rlmx_.unlock ();
           }
       }
