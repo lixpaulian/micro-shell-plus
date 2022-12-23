@@ -1,7 +1,7 @@
 /*
  * ushell.cpp
  *
- * Copyright (c) 2021 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2021, 2022 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -188,6 +188,19 @@ namespace ushell
     int c = 0, r;
 
     if ((r = tty->read (&c, 1)) < 0)
+      {
+        c = r;
+      }
+
+    return c;
+  }
+
+  int
+  ushell::putchar (int c)
+  {
+    int r;
+
+    if ((r = tty->write (&c, 1)) < 0)
       {
         c = r;
       }

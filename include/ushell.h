@@ -1,7 +1,7 @@
 /*
  * ushell.h
  *
- * Copyright (c) 2021 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2021, 2022 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -69,6 +69,8 @@ namespace ushell
     unused,
     ush_param_invalid,
 
+    out_of_memory = 30,
+
     ush_user_timeout = 98,
     ush_exit
   } error_types_t;
@@ -111,6 +113,9 @@ namespace ushell
     int
     getchar (void);
 
+    int
+    putchar (int c);
+
     static ushell_cmd* ushell_cmds_[SHELL_MAX_COMMANDS];
 
 #if SHELL_FILE_SUPPORT == true
@@ -137,7 +142,7 @@ namespace ushell
 
     static constexpr uint8_t VERSION_MAJOR = 0;
     static constexpr uint8_t VERSION_MINOR = 4;
-    static constexpr uint8_t VERSION_PATCH = 1;
+    static constexpr uint8_t VERSION_PATCH = 2;
 
   };
 
