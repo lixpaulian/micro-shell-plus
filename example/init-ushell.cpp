@@ -39,7 +39,7 @@
 
 #include "init-ushell.h"
 
-#define STATIC_USHELL true
+#define STATIC_USHELL false
 #define SHELL_HISTORY_FILE "/flash/history.txt"
 
 #if !defined SHELL_HISTORY_FILE
