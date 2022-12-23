@@ -1,7 +1,7 @@
 /*
  * builtin-cmds.cpp
  *
- * Copyright (c) 2021 Lix N. Paulian (lix@paulian.net)
+ * Copyright (c) 2021, 2022 Lix N. Paulian (lix@paulian.net)
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -218,7 +218,7 @@ namespace ushell
                   }
                 else
                   {
-                    my_rtc.set_cal_factor (atoi (getopt.optarg));
+                    my_rtc.set_cal_factor (arg);
                   }
               }
             break;
