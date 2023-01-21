@@ -8,7 +8,7 @@
  * this code. See also <https://github.com/Holixus/readline>.
  *
  * The scope of changes was to create a "readline" intended for small embedded
- * systems, keeping calls to malloc/free to a reasonable minimum inckuding the
+ * systems, keeping calls to malloc/free to a reasonable minimum including the
  * option to completely eliminate them. Depending on the available resources
  * "readline" can be configured from a minimum functionality to full featured
  * (history, auto-completion, non-volatile history, etc.).
