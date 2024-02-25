@@ -46,7 +46,7 @@ namespace os
         tty
           { impl, name }
     {
-      type_ |= type::tty;
+      type_ |= static_cast<type_t>(type::tty);
 #if defined(OS_TRACE_POSIX_IO_TTY)
       trace::printf ("tty_canonical::%s(\"%s\")=@%p\n", __func__, name_, this);
 #endif
